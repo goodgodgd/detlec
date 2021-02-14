@@ -9,19 +9,16 @@ from timeit import default_timer as timer
 Common utils
 """
 class DurationTime:
-    def __init__(self):
+    def __init__(self, context):
         self.start = 0
-        self.end = 0
+        self.context = context
 
     def __enter__(self):        # entering 'with' context
         self.start = timer()
         return self             # pass object by 'as'
 
     def __exit__(self, type, value, trace_back):    # exiting 'with' context
-        self.end = timer()
-
-    def duration(self):
-        return self.end - self.start
+        print(f"{self.context}: {timer() - self.start:1.2f}")
 
 
 def gpu_config():
@@ -38,7 +35,7 @@ def gpu_config():
             print(e)
 
 
-def load_data(dataname="cifar10"):
+def load_dataset(dataname="cifar10"):
     if dataname == "cifar10":
         dataset = tf.keras.datasets.cifar10
     else:
@@ -85,13 +82,12 @@ class AdvancedClassifier:
 
         dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
         dataset = dataset.shuffle(200).batch(self.batch_size)
-        with DurationTime() as duration:
+        with DurationTime("** training time") as duration:
             for epoch in range(epochs):
                 for x_batch, y_batch in dataset:
                     train_batch_func(x_batch, y_batch)
                 loss, accuracy = self.evaluate(x_val, y_val, verbose=False)
                 print(f"[Training] epoch={epoch}, val_loss={loss}, val_accuracy={accuracy}")
-        print(f"[train] training time: {duration.duration():1.2f}")
 
     def train_batch_eager(self, x_batch, y_batch):
         with tf.GradientTape() as tape:
@@ -113,8 +109,9 @@ class AdvancedClassifier:
         accuracy = np.mean(np.argmax(y_pred, axis=1) == y_true[:, 0])
         loss = self.loss_object(y_true, y_pred)
         if verbose:
+            np.set_printoptions(precision=4, suppress=True)
             print("  prediction shape:", y_pred.shape, y_true.shape)
-            print("  first 5 predicts:\n", y_pred[:5])
+            print("  first 5 predicts:\n", y_pred[:5].numpy())
             print("  check probability:", np.sum(y_pred[:5], axis=1))
             print("  loss and accuracy:", loss, accuracy)
         return loss, accuracy
@@ -122,7 +119,7 @@ class AdvancedClassifier:
 
 def tf2_advanced_classifier():
     gpu_config()
-    (x_train, y_train), (x_test, y_test) = load_data("cifar10")
+    (x_train, y_train), (x_test, y_test) = load_dataset("cifar10")
     clsf = AdvancedClassifier()
     clsf.build_model(x_train, y_train)
     clsf.train(x_train, y_train, 5, eager_mode=False)

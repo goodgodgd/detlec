@@ -10,19 +10,16 @@ from timeit import default_timer as timer
 Common utils
 """
 class DurationTime:
-    def __init__(self):
+    def __init__(self, context):
         self.start = 0
-        self.end = 0
+        self.context = context
 
     def __enter__(self):        # entering 'with' context
         self.start = timer()
         return self             # pass object by 'as'
 
     def __exit__(self, type, value, trace_back):    # exiting 'with' context
-        self.end = timer()
-
-    def duration(self):
-        return self.end - self.start
+        print(f"{self.context}: {timer() - self.start:1.2f}")
 
 
 def gpu_config():
@@ -39,11 +36,15 @@ def gpu_config():
             print(e)
 
 
-def load_dataset():
-    cifar10 = tf.keras.datasets.cifar10
-    (x_train, y_train), (x_test, y_test) = cifar10.load_data()
+def load_dataset(dataname="cifar10"):
+    if dataname == "cifar10":
+        dataset = tf.keras.datasets.cifar10
+    else:
+        raise ValueError(f"Invalid dataset name: {dataname}")
+
+    (x_train, y_train), (x_test, y_test) = dataset.load_data()
     x_train, x_test = x_train / 255.0, x_test / 255.0
-    print(f"Load cifar10 dataset:", x_train.shape, y_train.shape, x_test.shape, y_test.shape)
+    print(f"Load {dataname} dataset:", x_train.shape, y_train.shape, x_test.shape, y_test.shape)
     return (x_train, y_train), (x_test, y_test)
 
 
@@ -104,9 +105,8 @@ def train_model(model, train_data, split_ratio=0.8):
         metrics=[keras.metrics.SparseCategoricalAccuracy()],
     )
 
-    with DurationTime as duration:
+    with DurationTime("** training time") as duration:
         history = model.fit(x_train, y_train, batch_size=32, epochs=5, validation_data=(x_val, y_val))
-    print(f"[train_model] training time: {duration.duration():1.2f}")
     history = {key: np.array(values) for key, values in history.history.items()}
     np.set_printoptions(precision=4, suppress=True)
     pp = pprint.PrettyPrinter(indent=2, width=100, compact=True)
