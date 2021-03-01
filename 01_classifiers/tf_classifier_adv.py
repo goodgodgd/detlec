@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 import numpy as np
+import matplotlib.pyplot as plt
 from timeit import default_timer as timer
 
 
@@ -35,16 +36,33 @@ def gpu_config():
             print(e)
 
 
-def load_dataset(dataname="cifar10"):
+def load_dataset(dataname="cifar10", show_imgs=True):
     if dataname == "cifar10":
         dataset = tf.keras.datasets.cifar10
+        class_names = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     else:
         raise ValueError(f"Invalid dataset name: {dataname}")
 
     (x_train, y_train), (x_test, y_test) = dataset.load_data()
     x_train, x_test = x_train / 255.0, x_test / 255.0
+    y_train, y_test = y_train[:, 0], y_test[:, 0]
     print(f"Load {dataname} dataset:", x_train.shape, y_train.shape, x_test.shape, y_test.shape)
+    if show_imgs:
+        show_samples(x_train, y_train, class_names)
     return (x_train, y_train), (x_test, y_test)
+
+
+def show_samples(images, labels, class_names, grid=(3,4)):
+    plt.figure(figsize=grid)
+    num_samples = grid[0] * grid[1]
+    for i in range(num_samples):
+        plt.subplot(grid[0], grid[1], i+1)
+        plt.xticks([])
+        plt.yticks([])
+        plt.grid(False)
+        plt.imshow(images[i])
+        plt.xlabel(class_names[labels[i]])
+    plt.show()
 
 
 """
@@ -74,22 +92,22 @@ class AdvancedClassifier:
         self.model.summary()
         keras.utils.plot_model(self.model, "tf-clsf-model-adv.png")
 
-    def train(self, x, y, epochs, eager_mode=True):
+    def train(self, x, y, epochs):
         trainlen = int(x.shape[0] * (1 - self.val_ratio))
         x_train, y_train = x[:trainlen], y[:trainlen]
         x_val, y_val = x[trainlen:], y[trainlen:]
-        train_batch_func = self.train_batch_eager if eager_mode else self.train_batch_graph
 
         dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
         dataset = dataset.shuffle(200).batch(self.batch_size)
         with DurationTime("** training time") as duration:
             for epoch in range(epochs):
                 for x_batch, y_batch in dataset:
-                    train_batch_func(x_batch, y_batch)
+                    self.train_batch_graph(x_batch, y_batch)
                 loss, accuracy = self.evaluate(x_val, y_val, verbose=False)
                 print(f"[Training] epoch={epoch}, val_loss={loss}, val_accuracy={accuracy}")
 
-    def train_batch_eager(self, x_batch, y_batch):
+    @tf.function
+    def train_batch_graph(self, x_batch, y_batch):
         with tf.GradientTape() as tape:
             # training=True is only needed if there are layers with different
             # behavior during training versus inference (e.g. Dropout).
@@ -98,22 +116,18 @@ class AdvancedClassifier:
         gradients = tape.gradient(loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
-    @tf.function
-    def train_batch_graph(self, x_batch, y_batch):
-        self.train_batch_eager(x_batch, y_batch)
-
     def evaluate(self, x, y_true, verbose=True):
         if verbose:
             print("[evaluate] predict by model.__call__()")
         y_pred = self.model(x)
-        accuracy = np.mean(np.argmax(y_pred, axis=1) == y_true[:, 0])
+        accuracy = np.mean(np.argmax(y_pred, axis=1) == y_true)
         loss = self.loss_object(y_true, y_pred)
         if verbose:
             np.set_printoptions(precision=4, suppress=True)
             print("  prediction shape:", y_pred.shape, y_true.shape)
             print("  first 5 predicts:\n", y_pred[:5].numpy())
             print("  check probability:", np.sum(y_pred[:5], axis=1))
-            print("  loss and accuracy:", loss, accuracy)
+            print(f"  loss={loss}, accuracy={accuracy}")
         return loss, accuracy
 
 
@@ -122,7 +136,7 @@ def tf2_advanced_classifier():
     (x_train, y_train), (x_test, y_test) = load_dataset("cifar10")
     clsf = AdvancedClassifier()
     clsf.build_model(x_train, y_train)
-    clsf.train(x_train, y_train, 5, eager_mode=False)
+    clsf.train(x_train, y_train, 5)
     clsf.evaluate(x_test, y_test)
 
 

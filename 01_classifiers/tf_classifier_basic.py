@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 import numpy as np
+import matplotlib.pyplot as plt
 import pprint
 from timeit import default_timer as timer
 
@@ -36,16 +37,33 @@ def gpu_config():
             print(e)
 
 
-def load_dataset(dataname="cifar10"):
+def load_dataset(dataname="cifar10", show_imgs=True):
     if dataname == "cifar10":
         dataset = tf.keras.datasets.cifar10
+        class_names = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     else:
         raise ValueError(f"Invalid dataset name: {dataname}")
 
     (x_train, y_train), (x_test, y_test) = dataset.load_data()
     x_train, x_test = x_train / 255.0, x_test / 255.0
+    y_train, y_test = y_train[:, 0], y_test[:, 0]
     print(f"Load {dataname} dataset:", x_train.shape, y_train.shape, x_test.shape, y_test.shape)
+    if show_imgs:
+        show_samples(x_train, y_train, class_names)
     return (x_train, y_train), (x_test, y_test)
+
+
+def show_samples(images, labels, class_names, grid=(3,4)):
+    plt.figure(figsize=grid)
+    num_samples = grid[0] * grid[1]
+    for i in range(num_samples):
+        plt.subplot(grid[0], grid[1], i+1)
+        plt.xticks([])
+        plt.yticks([])
+        plt.grid(False)
+        plt.imshow(images[i])
+        plt.xlabel(class_names[labels[i]])
+    plt.show()
 
 
 """
@@ -116,12 +134,13 @@ def train_model(model, train_data, split_ratio=0.8):
 
 def test_model(model, test_data):
     x_test, y_test = test_data
-    print("[test_model] evaluate by model.evaluate()")
     loss, accuracy = model.evaluate(x_test, y_test)
+    print("[test_model] evaluate by model.evaluate()")
     print(f"  test loss: {loss:1.4f}")
     print(f"  test accuracy: {accuracy:1.4f}")
-    print("[test_model] predict by model.predict()")
+
     predicts = model.predict(x_test)
+    print("[test_model] predict by model.predict()")
     print("  prediction shape:", predicts.shape, y_test.shape)
     print("  first 5 predicts:\n", predicts[:5])
     print("  check probability:", np.sum(predicts[:5], axis=1))
