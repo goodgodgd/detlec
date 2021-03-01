@@ -131,7 +131,7 @@ class TorchClassifier:
             print("  prediction shape:", y_pred.shape, y_true.shape)
             print("  first 5 predicts:\n", y_pred[:5].detach().numpy())
             print("  check probability:", torch.sum(y_pred[:5], dim=1))
-            print(f"  loss={loss.detach().numpy()}, accuracy={accuracy.detach().numpy()}")
+            print(f"  loss={loss.detach().numpy():1.4f}, accuracy={accuracy.detach().numpy():1.4f}")
         return loss, accuracy
 
 

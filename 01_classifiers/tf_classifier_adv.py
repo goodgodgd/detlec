@@ -127,7 +127,7 @@ class AdvancedClassifier:
             print("  prediction shape:", y_pred.shape, y_true.shape)
             print("  first 5 predicts:\n", y_pred[:5].numpy())
             print("  check probability:", np.sum(y_pred[:5], axis=1))
-            print(f"  loss={loss}, accuracy={accuracy}")
+            print(f"  loss={loss:1.4f}, accuracy={accuracy:1.4f}")
         return loss, accuracy
 
 
