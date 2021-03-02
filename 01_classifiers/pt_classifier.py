@@ -64,8 +64,18 @@ Classifier
 class TorchClsfModel(nn.Module):
     def __init__(self):
         super(TorchClsfModel, self).__init__()
+        self.conv_relu_pool1 = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1, padding_mode='zeros'),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.ReLU(),
+        )
+        self.conv_relu_pool2 = nn.Sequential(
+            nn.Conv2d(32, 64, 3, padding=1, padding_mode='zeros'),
+            nn.MaxPool2d(2, 2),
+            nn.ReLU(),
+        )
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1, padding_mode='zeros')
-        self.pool1 = nn.MaxPool2d(2, 2)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(32, 64, 3, padding=1, padding_mode='zeros')
         self.pool2 = nn.MaxPool2d(2, 2)
         self.fc1 = nn.Linear(64 * 8 * 8, 100)
@@ -73,9 +83,10 @@ class TorchClsfModel(nn.Module):
         self.softmax = nn.Softmax()
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.pool1(F.relu(x))
-        x = self.pool2(F.relu(self.conv2(x)))
+        # x = self.pool1(F.relu(self.conv1(x)))
+        # x = self.pool2(F.relu(self.conv2(x)))
+        x = self.conv_relu_pool1(x)
+        x = self.conv_relu_pool2(x)
         x = x.view(-1, 64 * 8 * 8)
         x = F.relu(self.fc1(x))
         x = F.dropout(x)
@@ -84,15 +95,12 @@ class TorchClsfModel(nn.Module):
 
 
 class TorchClassifier:
-    def __init__(self, batch_size=32, val_ratio=0.2):
-        self.model = TorchClsfModel()
+    def __init__(self, model, batch_size=32, val_ratio=0.2):
+        self.model = model
         self.loss_object = nn.CrossEntropyLoss()
         self.optimizer = optim.RMSprop(self.model.parameters(), lr=0.001)
         self.batch_size = batch_size
         self.val_ratio = val_ratio
-        self.transform = transforms.Compose(
-            [transforms.ToTensor(),
-             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
     def train(self, x, y, epochs):
         x, y = torch.from_numpy(x).float(), torch.from_numpy(y)
@@ -135,12 +143,13 @@ class TorchClassifier:
         return loss, accuracy
 
 
-def pt_classifier():
+def torch_classifier():
     (x_train, y_train), (x_test, y_test) = load_dataset("cifar10")
-    clsf = TorchClassifier()
+    model = TorchClsfModel()
+    clsf = TorchClassifier(model)
     clsf.train(x_train, y_train, 5)
     clsf.evaluate(x_test, y_test)
 
 
 if __name__ == "__main__":
-    pt_classifier()
+    torch_classifier()
