@@ -136,8 +136,8 @@ def tf2_advanced_classifier():
     (x_train, y_train), (x_test, y_test) = load_dataset("cifar10")
     clsf = AdvancedClassifier()
     clsf.build_model(x_train, y_train)
-    clsf.train(x_train, y_train, 5)
-    clsf.evaluate(x_test, y_test)
+    # clsf.train(x_train, y_train, 5)
+    # clsf.evaluate(x_test, y_test)
 
 
 if __name__ == "__main__":

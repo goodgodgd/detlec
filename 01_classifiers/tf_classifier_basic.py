@@ -137,14 +137,14 @@ def test_model(model, test_data):
     loss, accuracy = model.evaluate(x_test, y_test)
     print("[test_model] evaluate by model.evaluate()")
     print(f"  test loss: {loss:1.4f}")
-    print(f"  test accuracy: {accuracy:1.4f}")
+    print(f"  test accuracy: {accuracy:1.4f}\n")
 
     predicts = model.predict(x_test)
     print("[test_model] predict by model.predict()")
     print("  prediction shape:", predicts.shape, y_test.shape)
     print("  first 5 predicts:\n", predicts[:5])
     print("  check probability:", np.sum(predicts[:5], axis=1))
-    print("  manual accuracy:", np.mean(np.argmax(predicts, axis=1) == y_test[:, 0]))
+    print("  manual accuracy:", np.mean(np.argmax(predicts, axis=1) == y_test))
 
 
 if __name__ == "__main__":
