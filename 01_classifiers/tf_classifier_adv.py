@@ -93,6 +93,11 @@ class AdvancedClassifier:
         keras.utils.plot_model(self.model, "tf-clsf-model-adv.png")
 
     def train(self, x, y, epochs):
+        """
+        :param x: input image [N, H, W, 3], float
+        :param y: label indices [N], int
+        :param epochs: # epochs to train
+        """
         trainlen = int(x.shape[0] * (1 - self.val_ratio))
         x_train, y_train = x[:trainlen], y[:trainlen]
         x_val, y_val = x[trainlen:], y[trainlen:]
@@ -108,12 +113,17 @@ class AdvancedClassifier:
 
     @tf.function
     def train_batch_graph(self, x_batch, y_batch):
+        """
+        :param x_batch: input image [B, H, W, 3], float
+        :param y_batch: label indices [B], int
+        """
         with tf.GradientTape() as tape:
             # training=True is only needed if there are layers with different
             # behavior during training versus inference (e.g. Dropout).
             predictions = self.model(x_batch, training=True)
             loss = self.loss_object(y_batch, predictions)
         gradients = tape.gradient(loss, self.model.trainable_variables)
+        print("loss", loss)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
     def evaluate(self, x, y_true, verbose=True):
@@ -136,8 +146,8 @@ def tf2_advanced_classifier():
     (x_train, y_train), (x_test, y_test) = load_dataset("cifar10")
     clsf = AdvancedClassifier()
     clsf.build_model(x_train, y_train)
-    # clsf.train(x_train, y_train, 5)
-    # clsf.evaluate(x_test, y_test)
+    clsf.train(x_train, y_train, 5)
+    clsf.evaluate(x_test, y_test)
 
 
 if __name__ == "__main__":

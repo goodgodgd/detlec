@@ -113,7 +113,7 @@ def create_model(dataset, use_add=True):
 
 def train_model(model, train_data, split_ratio=0.8):
     x, y = train_data
-    trainlen = int(tf.shape(x)[0].numpy() * split_ratio)
+    trainlen = int(x.shape[0] * split_ratio)
     x_train, y_train = x[:trainlen], y[:trainlen]
     x_val, y_val = x[trainlen:], y[trainlen:]
 
