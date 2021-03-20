@@ -1,36 +1,74 @@
+import sys
 import os.path as op
 import tensorflow as tf
 import numpy as np
+import pickle
+from glob import glob
 
-RAW_DATA_PATH = "/home/ian/workspace/dataset/cifar-10-batches-py"
-TFRECORD_PATH = "/home/ian/workspace/dataset/cifar-10-tfrecord"
-CLASS_NAMES = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
+class Config:
+    RAW_DATA_PATH = "/home/ian/workspace/detlec/dataset/cifar-10-batches-py"
+    TFRECORD_PATH = "/home/ian/workspace/detlec/dataset/cifar-10-tfrecord"
+    CLASS_NAMES = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 
 def main():
-    train_set, test_set = load_cifar10_dataset()
-    make_tfrecord(train_set, "train")
-    make_tfrecord(test_set, "test")
+    test_serializer()
+    train_set, test_set = load_cifar10_dataset(Config.RAW_DATA_PATH)
+    make_tfrecord(train_set, "train", Config.CLASS_NAMES, Config.TFRECORD_PATH)
+    make_tfrecord(test_set, "test", Config.CLASS_NAMES, Config.TFRECORD_PATH)
 
 
-def load_cifar10_dataset():
-    return (1, 2), (3, 4)
+def test_serializer():
+    example = {"name": "car", "int": 10, "float": 1.1, "np": np.array([1, 2, 3]).astype(np.uint8)}
+    print(TfrSerializer().convert_to_feature(example))
 
 
-def make_tfrecord(dataset, split):
+def load_cifar10_dataset(data_path):
+    train_files = glob(op.join(data_path, "data_*"))
+    train_labels = []
+    train_images = []
+    for file in train_files:
+        labels, images = read_data(file)
+        train_labels += labels
+        train_images.append(images)
+    train_images = np.concatenate(train_images, axis=0)
+
+    test_file = op.join(data_path, "test_batch")
+    test_labels, test_images = read_data(test_file)
+
+    print("[load_cifar10_dataset] train image and label shape:", train_images.shape, len(train_labels))
+    print("[load_cifar10_dataset] test image and label shape: ", test_images.shape, len(test_labels))
+    return (train_images, train_labels), (test_images, test_labels)
+
+
+def read_data(file):
+    with open(file, 'rb') as fo:
+        data = pickle.load(fo, encoding='bytes')
+        labels = data[b"labels"]    # list of category indices, [10000], int
+        images = data[b"data"]      # numpy array, [10000, 3072(=32x32x3)], np.uint8
+    return labels, images
+
+
+def make_tfrecord(dataset, split, class_names, tfr_path):
     xs, ys = dataset
-    labels = np.array(CLASS_NAMES)
+    labels = np.array(class_names)
     labels = labels[ys]
-    writer = tf.io.TFRecordWriter("")
+    writer = None
     serializer = TfrSerializer()
     for i, (x, y, label) in enumerate(zip(xs, ys, labels)):
         if i % 10000 == 0:
-            tfrfile = op.join(TFRECORD_PATH, f"cifar-10-{split}-{i//10000:03d}.tfrecord")
+            if writer:
+                writer.close()
+            tfrfile = op.join(tfr_path, f"cifar10-{split}-{i//10000:03d}.tfrecord")
             writer = tf.io.TFRecordWriter(tfrfile)
+            print(f"create tfrecord file at {i}: {tfrfile}")
 
         example = make_example(x, y, label)
         serialized = serializer(example)
         writer.write(serialized)
+
+    writer.close()
 
 
 def make_example(x, y, label):
@@ -38,27 +76,29 @@ def make_example(x, y, label):
 
 
 class TfrSerializer:
-    def __call__(self, example_dict):
-        features = self.convert_to_feature(example_dict)
+    def __call__(self, raw_example):
+        features = self.convert_to_feature(raw_example)
         # wrap the data as TensorFlow Features.
         features = tf.train.Features(feature=features)
         # wrap again as a TensorFlow Example.
-        example = tf.train.Example(features=features)
+        tf_example = tf.train.Example(features=features)
         # serialize the data.
-        serialized = example.SerializeToString()
+        serialized = tf_example.SerializeToString()
         return serialized
 
-    def convert_to_feature(self, example_dict):
+    def convert_to_feature(self, raw_example):
         features = dict()
-        for key, value in example_dict.items():
+        for key, value in raw_example.items():
             if value is None:
                 continue
             elif isinstance(value, np.ndarray):
-                features[key] = self._bytes_feature(value.tostring())
+                features[key] = self._bytes_feature(value)
+            elif isinstance(value, str):
+                features[key] = self._bytes_feature(value)
             elif isinstance(value, int):
                 features[key] = self._int64_feature(value)
             elif isinstance(value, float):
-                features[key] = self._int64_feature(value)
+                features[key] = self._float_feature(value)
             else:
                 assert 0, f"[convert_to_feature] Wrong data type: {type(value)}"
         return features
@@ -66,6 +106,10 @@ class TfrSerializer:
     @staticmethod
     def _bytes_feature(value):
         """Returns a bytes_list from a string / byte."""
+        if isinstance(value, np.ndarray):
+            value = value.tobytes()
+        elif isinstance(value, str):
+            value = bytes(value, 'utf-8')
         return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
     @staticmethod
@@ -79,3 +123,5 @@ class TfrSerializer:
         return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 
+if __name__ == "__main__":
+    main()
