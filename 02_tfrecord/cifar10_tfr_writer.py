@@ -1,22 +1,23 @@
-import sys
-import os.path as op
+import os
 import tensorflow as tf
 import numpy as np
 import pickle
 from glob import glob
+import cv2
 
 
 class Config:
     RAW_DATA_PATH = "/home/ian/workspace/detlec/dataset/cifar-10-batches-py"
-    TFRECORD_PATH = "/home/ian/workspace/detlec/dataset/cifar-10-tfrecord"
+    TFRECORD_PATH = "/home/ian/workspace/detlec/dataset/tfrecords"
     CLASS_NAMES = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    CIFAR_IMG_SHAPE = (32, 32, 3)
 
 
-def main():
+def write_cifar10_tfrecord():
     test_serializer()
-    train_set, test_set = load_cifar10_dataset(Config.RAW_DATA_PATH)
-    make_tfrecord(train_set, "train", Config.CLASS_NAMES, Config.TFRECORD_PATH)
-    make_tfrecord(test_set, "test", Config.CLASS_NAMES, Config.TFRECORD_PATH)
+    train_set, test_set = load_cifar10_dataset(Config.RAW_DATA_PATH, Config.CIFAR_IMG_SHAPE)
+    make_tfrecord(train_set, "cifar10", "train", Config.CLASS_NAMES, Config.TFRECORD_PATH)
+    make_tfrecord(test_set, "cifar10", "test", Config.CLASS_NAMES, Config.TFRECORD_PATH)
 
 
 def test_serializer():
@@ -24,45 +25,47 @@ def test_serializer():
     print(TfrSerializer().convert_to_feature(example))
 
 
-def load_cifar10_dataset(data_path):
-    train_files = glob(op.join(data_path, "data_*"))
+def load_cifar10_dataset(data_path, img_shape):
+    train_files = glob(os.path.join(data_path, "data_*"))
     train_labels = []
     train_images = []
     for file in train_files:
-        labels, images = read_data(file)
+        labels, images = read_data(file, img_shape)
         train_labels += labels
         train_images.append(images)
     train_images = np.concatenate(train_images, axis=0)
 
-    test_file = op.join(data_path, "test_batch")
-    test_labels, test_images = read_data(test_file)
+    test_file = os.path.join(data_path, "test_batch")
+    test_labels, test_images = read_data(test_file, img_shape)
 
     print("[load_cifar10_dataset] train image and label shape:", train_images.shape, len(train_labels))
     print("[load_cifar10_dataset] test image and label shape: ", test_images.shape, len(test_labels))
     return (train_images, train_labels), (test_images, test_labels)
 
 
-def read_data(file):
+def read_data(file, img_shape):
     with open(file, 'rb') as fo:
         data = pickle.load(fo, encoding='bytes')
         labels = data[b"labels"]    # list of category indices, [10000], int
         images = data[b"data"]      # numpy array, [10000, 3072(=32x32x3)], np.uint8
+        # CIFAR dataset is encoded in channel-first format
+        images = images.reshape((-1, img_shape[2], img_shape[0], img_shape[1]))
+        # convert to back channel-last format
+        images = np.transpose(images, (0, 2, 3, 1))
     return labels, images
 
 
-def make_tfrecord(dataset, split, class_names, tfr_path):
+def make_tfrecord(dataset, dataname, split, class_names, tfr_path):
     xs, ys = dataset
     labels = np.array(class_names)
     labels = labels[ys]
     writer = None
     serializer = TfrSerializer()
+    examples_per_shard = 10000
+
     for i, (x, y, label) in enumerate(zip(xs, ys, labels)):
-        if i % 10000 == 0:
-            if writer:
-                writer.close()
-            tfrfile = op.join(tfr_path, f"cifar10-{split}-{i//10000:03d}.tfrecord")
-            writer = tf.io.TFRecordWriter(tfrfile)
-            print(f"create tfrecord file at {i}: {tfrfile}")
+        if i % examples_per_shard == 0:
+            writer = open_tfr_writer(writer, tfr_path, dataname, split, i//examples_per_shard)
 
         example = make_example(x, y, label)
         serialized = serializer(example)
@@ -71,8 +74,21 @@ def make_tfrecord(dataset, split, class_names, tfr_path):
     writer.close()
 
 
+def open_tfr_writer(writer, tfr_path, dataname, split, shard_index):
+    if writer:
+        writer.close()
+
+    tfrdata_path = os.path.join(tfr_path, f"{dataname}_{split}")
+    if os.path.isdir(tfr_path) and not os.path.isdir(tfrdata_path):
+        os.makedirs(tfrdata_path)
+    tfrfile = os.path.join(tfrdata_path, f"shard_{shard_index:03d}.tfrecord")
+    writer = tf.io.TFRecordWriter(tfrfile)
+    print(f"create tfrecord file: {tfrfile}")
+    return writer
+
+
 def make_example(x, y, label):
-    return {"image": x, "class": y, "label": label}
+    return {"image": x, "label_index": y, "label_name": label}
 
 
 class TfrSerializer:
@@ -107,7 +123,11 @@ class TfrSerializer:
     def _bytes_feature(value):
         """Returns a bytes_list from a string / byte."""
         if isinstance(value, np.ndarray):
+            # method 1: encode into raw bytes - fast but losing shape, 2 seconds to make training dataset
             value = value.tobytes()
+            # method 2: encode into png format - slow but keeping shape, 10 seconds to make training dataset
+            # value = tf.io.encode_png(value)
+            # value = value.numpy()  # BytesList won't unpack a tf.string from an EagerTensor.
         elif isinstance(value, str):
             value = bytes(value, 'utf-8')
         return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
@@ -124,4 +144,4 @@ class TfrSerializer:
 
 
 if __name__ == "__main__":
-    main()
+    write_cifar10_tfrecord()
