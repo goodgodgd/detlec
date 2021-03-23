@@ -123,7 +123,6 @@ class AdvancedClassifier:
             predictions = self.model(x_batch, training=True)
             loss = self.loss_object(y_batch, predictions)
         gradients = tape.gradient(loss, self.model.trainable_variables)
-        print("loss", loss)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
     def evaluate(self, x, y_true, verbose=True):

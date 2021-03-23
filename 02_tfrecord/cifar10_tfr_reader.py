@@ -37,20 +37,20 @@ def parse_example(example):
     features = {
         "image": tf.io.FixedLenFeature(shape=(), dtype=tf.string, default_value=""),
         "label_index": tf.io.FixedLenFeature(shape=(), dtype=tf.int64, default_value=0),
-        "label_name": tf.io.FixedLenFeature([], tf.string, default_value=""),
+        "label_name": tf.io.FixedLenFeature(shape=(), dtype=tf.string, default_value=""),
     }
     parsed = tf.io.parse_single_example(example, features)
     # method 1. decode from raw bytes
     parsed["image"] = tf.io.decode_raw(parsed["image"], tf.uint8)
-    parsed["image"] = tf.reshape(parsed["image"], Config.CIFAR_IMG_SHAPE)
-    parsed["image_u8"] = parsed["image"]    # only for visualize
-    parsed["image"] = tf.image.convert_image_dtype(parsed["image"], dtype=tf.float32)   # for model input
+    # only for visualization
+    parsed["image_u8"] = tf.reshape(parsed["image"], Config.CIFAR_IMG_SHAPE)
+    parsed["image"] = tf.image.convert_image_dtype(parsed["image_u8"], dtype=tf.float32)     # for model input
     # method 2. decode from png format
     # parsed["image"] = tf.io.decode_png(parsed["image"])
     return parsed
 
 
-def set_properties(dataset, shuffle, epochs, batch_size):
+def set_properties(dataset, shuffle: bool, epochs: int, batch_size: int):
     if shuffle:
         dataset = dataset.shuffle(100)
     dataset = dataset.batch(batch_size).repeat(epochs)
@@ -59,10 +59,11 @@ def set_properties(dataset, shuffle, epochs, batch_size):
 
 def check_data(dataset):
     for i, features in enumerate(dataset):
-        print("sample", i, features["image_u8"].shape, features["image"].shape, features["label_index"].numpy(), features["label_name"].numpy())
+        print("sample:", i, features["image"].shape,
+              features["label_index"][:8].numpy(), features["label_name"][:8].numpy())
         if i == 0:
             show_samples(features["image_u8"], features["label_name"])
-        if i > 10:
+        if i > 5:
             break
 
 
@@ -141,7 +142,7 @@ class AdvancedClassifier:
             for epoch in range(epochs):
                 for i, features in enumerate(train_dataset):
                     self.train_batch_graph(features["image"], features["label_index"])
-                loss, accuracy = self.evaluate(val_dataset)
+                loss, accuracy = self.evaluate(val_dataset, verbose=False)
                 print(f"[Training] epoch={epoch}, val_loss={loss:1.4f}, val_accuracy={accuracy:1.4f}")
 
     @tf.function

@@ -3,7 +3,6 @@ import tensorflow as tf
 import numpy as np
 import pickle
 from glob import glob
-import cv2
 
 
 class Config:
@@ -22,7 +21,15 @@ def write_cifar10_tfrecord():
 
 def test_serializer():
     example = {"name": "car", "int": 10, "float": 1.1, "np": np.array([1, 2, 3]).astype(np.uint8)}
-    print(TfrSerializer().convert_to_feature(example))
+    features = TfrSerializer().convert_to_feature(example)
+    print("=== dict of tf.train.Feature:\n", features)
+    features = tf.train.Features(feature=features)
+    print("=== tf.train.Features:\n", features)
+    tf_example = tf.train.Example(features=features)
+    print("=== tf.train.Example\n", tf_example)
+    serialized = tf_example.SerializeToString()
+    print("=== serialized\n", serialized)
+    print("")
 
 
 def load_cifar10_dataset(data_path, img_shape):
@@ -67,7 +74,7 @@ def make_tfrecord(dataset, dataname, split, class_names, tfr_path):
         if i % examples_per_shard == 0:
             writer = open_tfr_writer(writer, tfr_path, dataname, split, i//examples_per_shard)
 
-        example = make_example(x, y, label)
+        example = {"image": x, "label_index": y, "label_name": label}
         serialized = serializer(example)
         writer.write(serialized)
 
@@ -87,10 +94,6 @@ def open_tfr_writer(writer, tfr_path, dataname, split, shard_index):
     return writer
 
 
-def make_example(x, y, label):
-    return {"image": x, "label_index": y, "label_name": label}
-
-
 class TfrSerializer:
     def __call__(self, raw_example):
         features = self.convert_to_feature(raw_example)
@@ -108,8 +111,14 @@ class TfrSerializer:
             if value is None:
                 continue
             elif isinstance(value, np.ndarray):
+                # method 1: encode into raw bytes - fast but losing shape, 2 seconds to make training dataset
+                value = value.tobytes()
+                # method 2: encode into png format - slow but keeping shape, 10 seconds to make training dataset
+                # value = tf.io.encode_png(value)
+                # value = value.numpy()  # BytesList won't unpack a tf.string from an EagerTensor.
                 features[key] = self._bytes_feature(value)
             elif isinstance(value, str):
+                value = bytes(value, 'utf-8')
                 features[key] = self._bytes_feature(value)
             elif isinstance(value, int):
                 features[key] = self._int64_feature(value)
@@ -122,14 +131,6 @@ class TfrSerializer:
     @staticmethod
     def _bytes_feature(value):
         """Returns a bytes_list from a string / byte."""
-        if isinstance(value, np.ndarray):
-            # method 1: encode into raw bytes - fast but losing shape, 2 seconds to make training dataset
-            value = value.tobytes()
-            # method 2: encode into png format - slow but keeping shape, 10 seconds to make training dataset
-            # value = tf.io.encode_png(value)
-            # value = value.numpy()  # BytesList won't unpack a tf.string from an EagerTensor.
-        elif isinstance(value, str):
-            value = bytes(value, 'utf-8')
         return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
     @staticmethod
