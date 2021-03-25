@@ -4,7 +4,8 @@ import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
 
 from config import Config as cfg
-import tfrecord_writer as tw
+from tfrecord.tfrecord_writer import TfrecordMaker
+import settings
 
 
 def create_tfrecords():
@@ -18,7 +19,7 @@ def create_tfrecords():
 
             srcpath = cfg.Paths.RAW_DATA[dataset]
             dstshape = cfg.get_img_shape("HW", dataset)
-            tfrmaker = tw.tfrecord_maker_factory(dataset, split, srcpath, tfrpath, dstshape)
+            tfrmaker = TfrecordMaker(dataset, split, srcpath, tfrpath, dstshape)
             tfrmaker.make()
 
 

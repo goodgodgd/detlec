@@ -9,7 +9,8 @@ class Config:
 
     class Dataset:
         DATASETS_FOR_TFRECORD = {"kitti": ("train", "val", "test")}
-        INPUT_RESOLUTIONS = {"kitti": (300, 1000)}
+        INPUT_RESOLUTIONS = {"kitti": (302, 1000)}
+        INVALID_CATEGORY = 100
 
     class Train:
         BATCH_SIZE = 2
