@@ -29,9 +29,10 @@ class KittiReader(DataReaderBase):
     Public methods used outside this class
     """
     def init_drive(self, drive_path, split):
-        self.frame_names = glob(op.join(drive_path, "*.png"))
-        self.frame_names.sort()
-        print("[KittiReader.init_drive] # frames:", len(self.frame_names), "first:", self.frame_names[0])
+        frame_names = glob(op.join(drive_path, "*.png"))
+        frame_names.sort()
+        print("[KittiReader.init_drive] # frames:", len(frame_names), "first:", frame_names[0])
+        return frame_names
 
     def get_image(self, index):
         return cv2.imread(self.frame_names[index])
@@ -44,22 +45,49 @@ class KittiReader(DataReaderBase):
             bboxes = []
             for line in lines:
                 bbox = self.extract_box(line)
-                bboxes.append(bbox)
+                if bbox is not None:
+                    bboxes.append(bbox)
 
         bboxes = np.array(bboxes)
         return bboxes
 
     def extract_box(self, line):
         raw_label = line.strip("\n").split(" ")
-        category = self.map_category(raw_label[0])
+        category_name = raw_label[0]
+        if category_name not in KITTI_CATEGORIES:
+            return None
+        category_index = KITTI_CATEGORIES[category_name]
         x1 = round(float(raw_label[4]))
         y1 = round(float(raw_label[5]))
         x2 = round(float(raw_label[6]))
         y2 = round(float(raw_label[7]))
-        return np.array([x1, y1, x2, y2, category], dtype=np.int32)
+        return np.array([x1, y1, x2, y2, category_index], dtype=np.int32)
 
-    def map_category(self, srclabel):
-        if srclabel in KITTI_CATEGORIES:
-            return KITTI_CATEGORIES[srclabel]
-        else:
-            return cfg.Dataset.INVALID_CATEGORY
+
+
+# ==================================================
+
+
+def test_kitti_reader():
+    print("===== start test_kitti_reader")
+    kitti_path = "/media/ian/Ian4T/dataset/kitti_detection"
+    drive_mngr = KittiDriveManager(kitti_path, "train")
+    drive_paths = drive_mngr.get_drive_paths()
+    reader = KittiReader(drive_paths[0], "train")
+    for i in range(reader.num_frames()):
+        image = reader.get_image(i)
+        bboxes = reader.get_bboxes(i)
+        print(f"frame {i}, bboxes:\n", bboxes)
+        for bbox in bboxes:
+            pt1, pt2 = (bbox[0], bbox[1]), (bbox[2], bbox[3])
+            image = cv2.rectangle(image, pt1, pt2, (255, 0, 0), thickness=2)
+        cv2.imshow("kitti", image)
+        key = cv2.waitKey()
+        if key == ord('q'):
+            break
+
+    print("!!! test_kitti_reader passed")
+
+
+if __name__ == "__main__":
+    test_kitti_reader()
