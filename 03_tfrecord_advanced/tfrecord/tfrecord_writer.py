@@ -176,7 +176,6 @@ class TfrecordMaker:
         assert ('image' in example) and (example['image'] is not None)
         config = tu.inspect_properties(example)
         config["length"] = self.drive_example_count
-        config["imshape"] = self.hw_shape
         print("## save config", config)
         with open(op.join(self.tfr_drive_path, "tfr_config.txt"), "w") as fr:
             json.dump(config, fr)

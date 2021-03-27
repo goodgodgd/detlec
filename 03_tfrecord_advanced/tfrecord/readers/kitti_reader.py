@@ -14,7 +14,7 @@ class KittiDriveManager(DriveManagerBase):
         super().__init__(datapath, split)
 
     def list_drive_paths(self):
-        kitti_split = "training" if self.split == "train" else "testing"
+        kitti_split = "training"    # if self.split == "train" else "testing"
         return [op.join(self.datapath, kitti_split, "image_2")]
 
     def get_drive_name(self, drive_index):
@@ -31,6 +31,10 @@ class KittiReader(DataReaderBase):
     def init_drive(self, drive_path, split):
         frame_names = glob(op.join(drive_path, "*.png"))
         frame_names.sort()
+        if split == "train":
+            frame_names = frame_names[:-500]
+        else:
+            frame_names = frame_names[-500:]
         print("[KittiReader.init_drive] # frames:", len(frame_names), "first:", frame_names[0])
         return frame_names
 

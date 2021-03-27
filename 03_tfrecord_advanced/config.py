@@ -8,7 +8,7 @@ class Config:
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
 
     class Dataset:
-        DATASETS_FOR_TFRECORD = {"kitti": ("train", "val", "test")}
+        DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
         INPUT_RESOLUTIONS = {"kitti": (302, 1000)}
         INVALID_CATEGORY = 100
         MAX_BBOX_PER_IMAGE = 20

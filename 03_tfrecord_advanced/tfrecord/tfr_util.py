@@ -78,6 +78,7 @@ def read_data_config(key, value):
 
 
 def draw_boxes(image, bboxes):
+    bboxes = bboxes[bboxes[:, 2] > 0, :]
     for bbox in bboxes:
         pt1, pt2 = (bbox[1], bbox[0]), (bbox[3], bbox[2])
         image = cv2.rectangle(image, pt1, pt2, (255, 0, 0), thickness=2)
