@@ -60,6 +60,8 @@ def read_data_config(key, value):
     if isinstance(value, np.ndarray):
         if value.dtype == np.uint8:
             decode_type = "tf.uint8"
+        elif value.dtype == np.int32:
+            decode_type = "tf.int32"
         elif value.dtype == np.float32:
             decode_type = "tf.float32"
         else:
@@ -73,3 +75,10 @@ def read_data_config(key, value):
         assert 0, f"[read_data_config] Wrong type: {type(value)}, key={key}"
 
     return {"parse_type": parse_type, "decode_type": decode_type, "shape": shape}
+
+
+def draw_boxes(image, bboxes):
+    for bbox in bboxes:
+        pt1, pt2 = (bbox[1], bbox[0]), (bbox[3], bbox[2])
+        image = cv2.rectangle(image, pt1, pt2, (255, 0, 0), thickness=2)
+    return image

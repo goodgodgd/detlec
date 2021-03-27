@@ -19,7 +19,7 @@ def create_tfrecords():
 
             srcpath = cfg.Paths.RAW_DATA[dataset]
             dstshape = cfg.get_img_shape("HW", dataset)
-            tfrmaker = TfrecordMaker(dataset, split, srcpath, tfrpath, dstshape)
+            tfrmaker = TfrecordMaker(dataset, split, srcpath, tfrpath, dstshape, cfg.Dataset.MAX_BBOX_PER_IMAGE)
             tfrmaker.make()
 
 

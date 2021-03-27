@@ -4,7 +4,7 @@ from glob import glob
 import cv2
 
 from tfrecord.readers.reader_base import DataReaderBase, DriveManagerBase
-from config import Config as cfg
+import tfrecord.tfr_util as tu
 
 KITTI_CATEGORIES = {"Pedestrian": 0, "Car": 1, "Van": 2, "Cyclist": 3}
 
@@ -18,7 +18,7 @@ class KittiDriveManager(DriveManagerBase):
         return [op.join(self.datapath, kitti_split, "image_2")]
 
     def get_drive_name(self, drive_index):
-        raise NotImplementedError()
+        return f"train"
 
 
 class KittiReader(DataReaderBase):
@@ -42,12 +42,8 @@ class KittiReader(DataReaderBase):
         label_file = image_file.replace("image_2", "label_2").replace(".png", ".txt")
         with open(label_file, 'r') as f:
             lines = f.readlines()
-            bboxes = []
-            for line in lines:
-                bbox = self.extract_box(line)
-                if bbox is not None:
-                    bboxes.append(bbox)
-
+            bboxes = [self.extract_box(line) for line in lines]
+            bboxes = [bbox for bbox in bboxes if bbox is not None]
         bboxes = np.array(bboxes)
         return bboxes
 
@@ -57,16 +53,14 @@ class KittiReader(DataReaderBase):
         if category_name not in KITTI_CATEGORIES:
             return None
         category_index = KITTI_CATEGORIES[category_name]
-        x1 = round(float(raw_label[4]))
         y1 = round(float(raw_label[5]))
-        x2 = round(float(raw_label[6]))
+        x1 = round(float(raw_label[4]))
         y2 = round(float(raw_label[7]))
-        return np.array([x1, y1, x2, y2, category_index], dtype=np.int32)
-
+        x2 = round(float(raw_label[6]))
+        return np.array([y1, x1, y2, x2, category_index], dtype=np.int32)
 
 
 # ==================================================
-
 
 def test_kitti_reader():
     print("===== start test_kitti_reader")
@@ -78,14 +72,11 @@ def test_kitti_reader():
         image = reader.get_image(i)
         bboxes = reader.get_bboxes(i)
         print(f"frame {i}, bboxes:\n", bboxes)
-        for bbox in bboxes:
-            pt1, pt2 = (bbox[0], bbox[1]), (bbox[2], bbox[3])
-            image = cv2.rectangle(image, pt1, pt2, (255, 0, 0), thickness=2)
-        cv2.imshow("kitti", image)
+        boxed_image = tu.draw_boxes(image, bboxes)
+        cv2.imshow("kitti", boxed_image)
         key = cv2.waitKey()
         if key == ord('q'):
             break
-
     print("!!! test_kitti_reader passed")
 
 

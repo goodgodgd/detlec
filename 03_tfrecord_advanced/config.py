@@ -3,7 +3,7 @@ import os.path as op
 
 class Config:
     class Paths:
-        RAW_DATA = {"kitti": ""}
+        RAW_DATA = {"kitti": "/media/ian/Ian4T/dataset/kitti_detection"}
         RESULT_ROOT = "/home/ian/workspace/detlec/dataset"
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
 
@@ -11,6 +11,7 @@ class Config:
         DATASETS_FOR_TFRECORD = {"kitti": ("train", "val", "test")}
         INPUT_RESOLUTIONS = {"kitti": (302, 1000)}
         INVALID_CATEGORY = 100
+        MAX_BBOX_PER_IMAGE = 20
 
     class Train:
         BATCH_SIZE = 2
