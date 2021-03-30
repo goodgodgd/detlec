@@ -129,8 +129,8 @@ class TfrecordMaker:
 
             serialized_example = self.serializer(example)
             self.write_example(serialized_example)
-            uf.print_progress(f"==[write_drive]: in-shard: {self.shard_example_count}/{self.shard_size} | "
-                              f"in-drive: {self.drive_example_count}/{num_drive_frames} | "
+            uf.print_progress(f"==[write_drive]: shard: {self.shard_index}/{self.shard_example_count}/{self.shard_size} | "
+                              f"drive: {self.drive_example_count}/{index}/{num_drive_frames} | "
                               f"total: {self.total_example_count} | time: {timer() - time1:1.4f}")
         print("")
         return drive_example
@@ -142,6 +142,7 @@ class TfrecordMaker:
         if not drive_example:
             drive_example = copy.deepcopy(example)
             print("[verify_example] initialize drive_example:", list(drive_example.keys()))
+            self.write_tfrecord_config(drive_example)
             return drive_example
         # check key change
         if list(drive_example.keys()) != list(example.keys()):
@@ -172,8 +173,6 @@ class TfrecordMaker:
             self.open_new_writer(self.shard_index)
 
     def write_tfrecord_config(self, example):
-        if self.drive_example_count == 0:
-            return
         assert ('image' in example) and (example['image'] is not None)
         config = tu.inspect_properties(example)
         config["length"] = self.drive_example_count

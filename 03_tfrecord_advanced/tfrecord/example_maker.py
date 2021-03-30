@@ -38,10 +38,8 @@ class ExampleMaker:
         # feature map sizes are derived from tfrecord image shape
         # feat_sizes: {"feature_l": hw_shape / 64, ...}
         feat_sizes = {key: np.array(self.hw_shape) // scale for key, scale in self.feat_scales.items()}
-        large, medium, small = make_gt_features(example["bboxes"], anchors_ratio, feat_sizes, self.feat_order)
-        example["feature_l"] = large
-        example["feature_m"] = medium
-        example["feature_s"] = small
+        gt_features = make_gt_features(example["bboxes"], anchors_ratio, feat_sizes, self.feat_order)
+        example.update(gt_features)
         return example
 
     def fix_bbox_len(self, bboxes):
@@ -57,7 +55,7 @@ class ExampleMaker:
         bboxes = uf.convert_box_format_yxhw_to_2pt(example["bboxes"])
         bboxes *= np.array([[height, width, height, width, 1]])
         bboxes = bboxes.astype(np.int32)
-        bboxes = bboxes[bboxes[:, 0] > 0, :]
+        bboxes = bboxes[bboxes[:, 2] > 0, :]
         print("[show example] bbox 2pts:\n", bboxes)
         boxed_image = tu.draw_boxes(example["image"], bboxes, cfg.Dataset.KITTI_CATEGORIES)
         cv2.imshow("image with bboxes", boxed_image)
@@ -136,19 +134,19 @@ def make_gt_features(bboxes, anchors, feat_sizes, feat_order):
     iou = inter_area / union_area
     best_anchor_indices = np.argmax(iou, axis=1)
     num_scales = len(feat_order)
-    bbox_dict = {feat_name: np.zeros((feat_shape[0], feat_shape[1], num_scales, 6), dtype=np.float32)
+    gt_features = {feat_name: np.zeros((feat_shape[0], feat_shape[1], num_scales, 6), dtype=np.float32)
                  for feat_name, feat_shape in feat_sizes.items()}
     for anchor_index, bbox in zip(best_anchor_indices, bboxes):
         scale_index = anchor_index // num_scales
         anchor_index_in_scale = anchor_index % num_scales
         feat_name = feat_order[scale_index]
-        feat_map = bbox_dict[feat_name]
+        feat_map = gt_features[feat_name]
         # bbox: [y, x, h, w, category] in ratio
         grid_yx = (bbox[:2] * feat_sizes[feat_name]).astype(np.int32)
         assert (grid_yx >= 0).all() and (grid_yx < feat_sizes[feat_name]).all()
         # bbox: [y, x, h, w, 1, category] in ratio
         box_at_grid = np.insert(bbox, 4, 1)
         feat_map[grid_yx[0], grid_yx[0], anchor_index_in_scale] = box_at_grid
-        bbox_dict[feat_name] = feat_map
-    return bbox_dict
+        gt_features[feat_name] = feat_map
+    return gt_features
 
