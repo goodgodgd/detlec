@@ -5,8 +5,8 @@ import cv2
 
 from tfrecord.readers.reader_base import DataReaderBase, DriveManagerBase
 import tfrecord.tfr_util as tu
-
-KITTI_CATEGORIES = {"Pedestrian": 0, "Car": 1, "Van": 2, "Cyclist": 3}
+import util_class as uc
+from config import Config as cfg
 
 
 class KittiDriveManager(DriveManagerBase):
@@ -48,15 +48,17 @@ class KittiReader(DataReaderBase):
             lines = f.readlines()
             bboxes = [self.extract_box(line) for line in lines]
             bboxes = [bbox for bbox in bboxes if bbox is not None]
+        if not bboxes:
+            raise uc.MyExceptionToCatch("[get_bboxes] empty boxes")
         bboxes = np.array(bboxes)
         return bboxes
 
     def extract_box(self, line):
         raw_label = line.strip("\n").split(" ")
         category_name = raw_label[0]
-        if category_name not in KITTI_CATEGORIES:
+        if category_name not in cfg.Dataset.KITTI_CATEGORY_MAP:
             return None
-        category_index = KITTI_CATEGORIES[category_name]
+        category_index = cfg.Dataset.KITTI_CATEGORY_MAP[category_name]
         y1 = round(float(raw_label[5]))
         x1 = round(float(raw_label[4]))
         y2 = round(float(raw_label[7]))

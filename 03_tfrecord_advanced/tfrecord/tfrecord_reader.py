@@ -38,7 +38,7 @@ class TfrecordReader:
 
     def get_dataset(self):
         """
-        :return features: {"image": ..., "bbox": ...}
+        :return features: {"image": ..., "bboxes": ...}
             image: (batch, height, width, 3)
             bbox: [y1, x1, y2, x2, category] (batch, grid_height, grid_width, 5)
         """

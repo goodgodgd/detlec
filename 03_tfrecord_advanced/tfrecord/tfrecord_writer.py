@@ -36,7 +36,7 @@ class TfrecordMaker:
     get raw examples from ExampleMaker and convert them into tf.data.Example
     serialize examples and write serialized data into tfrecord files
     """
-    def __init__(self, dataset, split, srcpath, tfrpath, hw_shape, max_bbox,
+    def __init__(self, dataset, split, srcpath, tfrpath, hw_shape,
                  shard_size=2000, drive_example_limit=0, total_example_limit=0):
         self.dataset = dataset              # dataset name e.g. "kitti"
         self.split = split                  # split name e.g. "train", "val", "test
@@ -44,24 +44,25 @@ class TfrecordMaker:
         self.tfrpath__ = tfrpath + "__"     # temporary path to write tfrecord
         self.tfrpath = tfrpath              # path to save final tfrecord
         self.tfr_drive_path = ""            # path to write current drive's tfrecord
-        self.hw_shape = hw_shape
-        self.max_bbox = max_bbox
+        self.hw_shape = hw_shape            # (height width) of image to be saved in tfrecord
         self.shard_size = shard_size        # max number of examples in a shard
         self.drive_example_limit = drive_example_limit
         self.total_example_limit = total_example_limit
+        # indices and counts
         self.drive_index = 0                # index of current drive
         self.shard_index = 0                # index of current shard
         self.shard_example_count = 0        # number of examples in this shard
         self.drive_example_count = 0        # number of examples in this drive
         self.total_example_count = 0        # number of examples in this dataset
+        self.error_count = 0
+        # objects
         self.drive_manger = drive_manager_factory(dataset, split, srcpath)
         self.serializer = tu.TfrSerializer()
         self.writer = None
         self.path_manager = uc.PathManager([""])
-        self.error_count = 0
 
     def make(self):
-        print("\n\n========== Start a new dataset:", op.basename(self.tfrpath))
+        print("\n\n========== Start dataset:", self.dataset)
         drive_paths = self.drive_manger.get_drive_paths()
         with uc.PathManager(self.tfrpath__, closer_func=self.on_exit) as path_manager:
             self.path_manager = path_manager
@@ -105,7 +106,7 @@ class TfrecordMaker:
 
     def write_drive(self, drive_path):
         data_reader = drive_reader_factory(self.dataset, self.split, drive_path)
-        example_maker = ExampleMaker(data_reader, self.hw_shape, self.max_bbox)
+        example_maker = ExampleMaker(data_reader, self.hw_shape)
         num_drive_frames = data_reader.num_frames()
         drive_example = {}
 
@@ -120,10 +121,10 @@ class TfrecordMaker:
                 example = example_maker.get_example(index)
                 drive_example = self.verify_example(drive_example, example)
             except StopIteration as si:  # raised from xxx_reader._get_frame()
-                print("\n==[write_drive][StopIteration] stop this drive", si)
+                print("\n==[write_drive][StopIteration] stop this drive\n", si)
                 break
             except uc.MyExceptionToCatch as me:  # raised from xxx_reader._get_frame()
-                uf.print_progress(f"\n==[write_drive][MyException] {index}/{num_drive_frames}, {me}")
+                uf.print_progress(f"\n==[write_drive][MyException] {index}/{num_drive_frames}, {me}\n")
                 continue
 
             serialized_example = self.serializer(example)
