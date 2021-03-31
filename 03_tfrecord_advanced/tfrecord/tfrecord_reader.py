@@ -64,7 +64,7 @@ class TfrecordReader:
     def dataset_process(self, dataset):
         if self.shuffle:
             dataset = dataset.shuffle(buffer_size=200)
-            print("[dataset] dataset suffled")
+            print("[dataset] dataset shuffled")
         print(f"[dataset] num epochs={self.epochs}, batch size={self.batch_size}")
         dataset = dataset.repeat(self.epochs)
         dataset = dataset.batch(batch_size=self.batch_size, drop_remainder=True)
@@ -78,6 +78,7 @@ class TfrecordReader:
 
 
 # ==================================================
+import numpy as np
 import tfrecord.tfr_util as tu
 
 
@@ -85,12 +86,25 @@ def test_read_dataset():
     print("===== start test_read_dataset")
     dataset = TfrecordReader(op.join(cfg.Paths.TFRECORD, "kitti_train")).get_dataset()
     for i, x in enumerate(dataset):
-        print(f"=== index: {i}, image={x['image'].shape}, bbox={x['bbox'].shape}")
+        print(f"=== index: {i}, image={x['image'].shape}, bbox={x['bboxes'].shape}"
+              f", feature_l={x['feature_l'].shape}, feature_s={x['feature_s'].shape}")
         image = uf.to_uint8_image(x['image'])
         image = image[0].numpy()
-        bbox = x['bbox'][0].numpy()
-        image = tu.draw_boxes(image, bbox)
-        cv2.imshow("image", image)
+        height, width = image.shape[:2]
+        bboxes = x['bboxes'][0].numpy()
+        bboxes = uf.convert_box_format_yxhw_to_2pt(bboxes, height, width)
+        image = tu.draw_boxes(image, bboxes, cfg.Dataset.KITTI_CATEGORIES)
+        cv2.imshow("image with boxes", image)
+
+        features = []
+        for feat_name in cfg.Model.FEATURE_ORDER:
+            feature = x[feat_name][0].numpy()
+            feature = feature[feature[..., 4] > 0]
+            features.append(feature)
+        feat_boxes = np.concatenate(features, axis=0)
+        feat_boxes = uf.convert_box_format_yxhw_to_2pt(feat_boxes, height, width)
+        image = tu.draw_boxes(image, feat_boxes, cfg.Dataset.KITTI_CATEGORIES)
+        cv2.imshow("image with feature bboxes", image)
         key = cv2.waitKey()
         if key == ord('q'):
             break
