@@ -17,7 +17,7 @@ class Config:
         MAX_BBOX_PER_IMAGE = 20
 
     class Model:
-        FEATURE_SCALES = {"feature_l": 64, "feature_m": 32, "feature_s": 16}
+        FEATURE_SCALES = {"feature_l": 32, "feature_m": 16, "feature_s": 8}
         FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
         ANCHORS_PIXEL = np.array([[13, 10], [30, 16], [23, 33],
                                   [61, 30], [45, 62], [119, 59],

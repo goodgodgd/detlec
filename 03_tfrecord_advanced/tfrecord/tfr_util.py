@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 import tensorflow as tf
 
+import util_function as uf
+
 
 class TfrSerializer:
     def __call__(self, raw_example):
@@ -90,9 +92,9 @@ def read_data_config(key, value):
 
 def draw_boxes(image, bboxes, category_names):
     bboxes = bboxes[bboxes[:, 2] > 0, :]
-    for bbox in bboxes:
+    for i, bbox in enumerate(bboxes):
         pt1, pt2 = (bbox[1], bbox[0]), (bbox[3], bbox[2])
         category = category_names[bbox[4]]
         image = cv2.rectangle(image, pt1, pt2, (255, 0, 0), thickness=2)
-        image = cv2.putText(image, category, pt1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        image = cv2.putText(image, f"{i}{category}", pt1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
     return image

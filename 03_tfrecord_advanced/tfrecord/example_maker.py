@@ -36,7 +36,7 @@ class ExampleMaker:
         # anchors_ratio: anchor sizes normalized by image size (0~1)
         anchors_ratio = self.anchors_pixel / np.array([raw_hw_shape])
         # feature map sizes are derived from tfrecord image shape
-        # feat_sizes: {"feature_l": hw_shape / 64, ...}
+        # feat_sizes: {"feature_l": hw_shape / 32, ...}
         feat_sizes = {key: np.array(self.hw_shape) // scale for key, scale in self.feat_scales.items()}
         gt_features = make_gt_features(example["bboxes"], anchors_ratio, feat_sizes, self.feat_order)
         example.update(gt_features)
@@ -51,14 +51,22 @@ class ExampleMaker:
             return bboxes
 
     def show_example(self, example):
-        height, width = example["image"].shape[:2]
-        bboxes = uf.convert_box_format_yxhw_to_2pt(example["bboxes"])
-        bboxes *= np.array([[height, width, height, width, 1]])
-        bboxes = bboxes.astype(np.int32)
+        image = example["image"].copy()
+        height, width = image.shape[:2]
+        bboxes = uf.convert_box_format_yxhw_to_2pt(example["bboxes"], height, width)
         bboxes = bboxes[bboxes[:, 2] > 0, :]
-        print("[show example] bbox 2pts:\n", bboxes)
-        boxed_image = tu.draw_boxes(example["image"], bboxes, cfg.Dataset.KITTI_CATEGORIES)
-        cv2.imshow("image with bboxes", boxed_image)
+        image = tu.draw_boxes(image, bboxes, cfg.Dataset.KITTI_CATEGORIES)
+        cv2.imshow("image with bboxes", image)
+
+        features = []
+        for feat_name in cfg.Model.FEATURE_ORDER:
+            feature = example[feat_name]
+            feature = feature[feature[..., 4] > 0]
+            features.append(feature)
+        feat_boxes = np.concatenate(features, axis=0)
+        feat_boxes = uf.convert_box_format_yxhw_to_2pt(feat_boxes, height, width)
+        image = tu.draw_boxes(image, feat_boxes, cfg.Dataset.KITTI_CATEGORIES)
+        cv2.imshow("image with feature bboxes", image)
         cv2.waitKey(100)
 
 
@@ -122,7 +130,7 @@ def make_gt_features(bboxes, anchors, feat_sizes, feat_order):
     """
     :param bboxes: bounding boxes in image ratio (0~1) [cy, cx, h, w, category] (N, 5)
     :param anchors: anchors in image ratio (0~1) (9, 2)
-    :param feat_sizes: feature map sizes for 3 feature maps {"feature_l": np.array([grid_h, grid_w]), ...}
+    :param feat_sizes: feature map sizes for 3 feature maps {"feature_l": [grid_h, grid_w], ...}
     :param feat_order: feature map order to map index to feature map name
     :return:
     """
@@ -136,6 +144,7 @@ def make_gt_features(bboxes, anchors, feat_sizes, feat_order):
     num_scales = len(feat_order)
     gt_features = {feat_name: np.zeros((feat_shape[0], feat_shape[1], num_scales, 6), dtype=np.float32)
                  for feat_name, feat_shape in feat_sizes.items()}
+
     for anchor_index, bbox in zip(best_anchor_indices, bboxes):
         scale_index = anchor_index // num_scales
         anchor_index_in_scale = anchor_index % num_scales
@@ -146,7 +155,7 @@ def make_gt_features(bboxes, anchors, feat_sizes, feat_order):
         assert (grid_yx >= 0).all() and (grid_yx < feat_sizes[feat_name]).all()
         # bbox: [y, x, h, w, 1, category] in ratio
         box_at_grid = np.insert(bbox, 4, 1)
-        feat_map[grid_yx[0], grid_yx[0], anchor_index_in_scale] = box_at_grid
+        feat_map[grid_yx[0], grid_yx[1], anchor_index_in_scale] = box_at_grid
         gt_features[feat_name] = feat_map
     return gt_features
 
