@@ -90,8 +90,22 @@ def read_data_config(key, value):
     return {"parse_type": parse_type, "decode_type": decode_type, "shape": shape}
 
 
-def draw_boxes(image, bboxes, category_names):
+def draw_boxes(image, bboxes, category_names, box_format="yxhw"):
+    """
+    :param image: (height, width, 3), np.uint8
+    :param bboxes: (N, 6), np.float32 (0~1) or np.int32 (pixel scale)
+    :param category_names: list of category names
+    :param box_format: "yxhw": [y, x, h, w, category] or "2pt": [y1, x1, y2, x2, category]
+    """
+    image = image.copy()
+    bboxes = bboxes.copy()
+    if np.max(bboxes) <= 1:
+        height, width = image.shape[:2]
+        bboxes *= np.array([height, width, height, width, 1], np.float32)
+    if box_format == "yxhw":
+        bboxes = uf.convert_box_format_yxhw_to_2pt(bboxes)
     bboxes = bboxes[bboxes[:, 2] > 0, :]
+
     for i, bbox in enumerate(bboxes):
         pt1, pt2 = (bbox[1], bbox[0]), (bbox[3], bbox[2])
         category = category_names[bbox[4]]

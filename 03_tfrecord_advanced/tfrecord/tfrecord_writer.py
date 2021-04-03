@@ -106,7 +106,7 @@ class TfrecordMaker:
 
     def write_drive(self, drive_path):
         data_reader = drive_reader_factory(self.dataset, self.split, drive_path)
-        example_maker = ExampleMaker(data_reader, self.hw_shape)
+        example_maker = ExampleMaker(data_reader, self.hw_shape, self.dataset)
         num_drive_frames = data_reader.num_frames()
         drive_example = {}
 

@@ -42,6 +42,9 @@ class KittiReader(DataReaderBase):
         return cv2.imread(self.frame_names[index])
 
     def get_bboxes(self, index):
+        """
+        :return: bounding boxes in 'yxhw' format
+        """
         image_file = self.frame_names[index]
         label_file = image_file.replace("image_2", "label_2").replace(".png", ".txt")
         with open(label_file, 'r') as f:
@@ -56,14 +59,15 @@ class KittiReader(DataReaderBase):
     def extract_box(self, line):
         raw_label = line.strip("\n").split(" ")
         category_name = raw_label[0]
-        if category_name not in cfg.Dataset.KITTI_CATEGORY_MAP:
+        if category_name not in cfg.Dataset.CATEGORY_NAMES["kitti"]:
             return None
-        category_index = cfg.Dataset.KITTI_CATEGORY_MAP[category_name]
+        category_index = cfg.Dataset.CATEGORY_NAMES["kitti"].index(category_name)
         y1 = round(float(raw_label[5]))
         x1 = round(float(raw_label[4]))
         y2 = round(float(raw_label[7]))
         x2 = round(float(raw_label[6]))
-        return np.array([y1, x1, y2, x2, category_index], dtype=np.int32)
+        bbox = np.array([(y1+y2)/2, (x1+x2)/2, y2-y1, x2-x1, category_index], dtype=np.int32)
+        return bbox
 
 
 # ==================================================
@@ -78,7 +82,7 @@ def test_kitti_reader():
         image = reader.get_image(i)
         bboxes = reader.get_bboxes(i)
         print(f"frame {i}, bboxes:\n", bboxes)
-        boxed_image = tu.draw_boxes(image, bboxes)
+        boxed_image = tu.draw_boxes(image, bboxes, cfg.Dataset.CATEGORY_NAMES["kitti"])
         cv2.imshow("kitti", boxed_image)
         key = cv2.waitKey()
         if key == ord('q'):

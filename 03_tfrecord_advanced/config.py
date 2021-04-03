@@ -10,10 +10,8 @@ class Config:
 
     class Dataset:
         DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
-        KITTI_CATEGORY_MAP = {"Pedestrian": 0, "Car": 1, "Van": 2, "Cyclist": 3}
-        KITTI_CATEGORIES = ["Pedestrian", "Car", "Van", "Cyclist"]
+        CATEGORY_NAMES = {"kitti": ["Pedestrian", "Car", "Van", "Cyclist"]}
         INPUT_RESOLUTIONS = {"kitti": (256, 832)}
-        INVALID_CATEGORY = 100
         MAX_BBOX_PER_IMAGE = 20
 
     class Model:

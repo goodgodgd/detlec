@@ -8,13 +8,15 @@ from config import Config as cfg
 
 
 class ExampleMaker:
-    def __init__(self, data_reader, hw_shape):
+    def __init__(self, data_reader, hw_shape, dataset_name):
         self.data_reader = data_reader
         self.hw_shape = hw_shape
+        self.dataset_name = dataset_name
         self.max_bbox = cfg.Dataset.MAX_BBOX_PER_IMAGE
         self.feat_scales = cfg.Model.FEATURE_SCALES
         self.feat_order = cfg.Model.FEATURE_ORDER
         self.anchors_pixel = cfg.Model.ANCHORS_PIXEL
+        self.image_preprocess = []
         self.crop_and_resize = CropperAndResizer(hw_shape)
 
     def get_example(self, index):
@@ -84,21 +86,16 @@ class ExampleMaker:
             return bboxes
 
     def show_example(self, example):
-        image = example["image"].copy()
-        height, width = image.shape[:2]
-        bboxes = uf.convert_box_format_yxhw_to_2pt(example["bboxes"], height, width)
-        bboxes = bboxes[bboxes[:, 2] > 0, :]
-        image = tu.draw_boxes(image, bboxes, cfg.Dataset.KITTI_CATEGORIES)
+        image = tu.draw_boxes(example["image"], example["bboxes"], cfg.Dataset.CATEGORY_NAMES[self.dataset_name])
         cv2.imshow("image with bboxes", image)
 
         features = []
         for feat_name in cfg.Model.FEATURE_ORDER:
             feature = example[feat_name]
-            feature = feature[feature[..., 4] > 0]
+            feature = feature[feature[..., 4] > 0]      # objectness == 1
             features.append(feature)
         feat_boxes = np.concatenate(features, axis=0)
-        feat_boxes = uf.convert_box_format_yxhw_to_2pt(feat_boxes, height, width)
-        image = tu.draw_boxes(image, feat_boxes, cfg.Dataset.KITTI_CATEGORIES)
+        image = tu.draw_boxes(example["image"], feat_boxes, cfg.Dataset.CATEGORY_NAMES[self.dataset_name])
         cv2.imshow("image with feature bboxes", image)
         cv2.waitKey(100)
 
