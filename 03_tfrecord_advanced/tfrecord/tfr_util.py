@@ -99,16 +99,17 @@ def draw_boxes(image, bboxes, category_names, box_format="yxhw"):
     """
     image = image.copy()
     bboxes = bboxes.copy()
-    if np.max(bboxes) <= 1:
+    if np.max(bboxes[:, :4]) <= 1:
         height, width = image.shape[:2]
-        bboxes *= np.array([height, width, height, width, 1], np.float32)
+        bboxes[:, :4] *= np.array([[height, width, height, width]], np.float32)
     if box_format == "yxhw":
         bboxes = uf.convert_box_format_yxhw_to_2pt(bboxes)
     bboxes = bboxes[bboxes[:, 2] > 0, :]
 
     for i, bbox in enumerate(bboxes):
         pt1, pt2 = (bbox[1], bbox[0]), (bbox[3], bbox[2])
-        category = category_names[bbox[4]]
+        cat_index = int(bbox[4])
+        category = category_names[cat_index]
         image = cv2.rectangle(image, pt1, pt2, (255, 0, 0), thickness=2)
         image = cv2.putText(image, f"{i}{category}", pt1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
     return image
