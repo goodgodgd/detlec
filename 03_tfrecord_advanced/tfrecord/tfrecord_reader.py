@@ -91,7 +91,7 @@ def test_read_dataset():
         image = uf.to_uint8_image(x['image'])
         image = image[0].numpy()
         bboxes = x['bboxes'][0].numpy()
-        image = tu.draw_boxes(image, bboxes, cfg.Dataset.CATEGORY_NAMES["kitti"])
+        image = tu.draw_boxes(image, bboxes, cfg.Tfrdata.CATEGORY_NAMES)
         cv2.imshow("image with boxes", image)
 
         features = []
@@ -100,7 +100,7 @@ def test_read_dataset():
             feature = feature[feature[..., 4] > 0]
             features.append(feature)
         feat_boxes = np.concatenate(features, axis=0)
-        image = tu.draw_boxes(image, feat_boxes, cfg.Dataset.CATEGORY_NAMES["kitti"])
+        image = tu.draw_boxes(image, feat_boxes, cfg.Tfrdata.CATEGORY_NAMES)
         cv2.imshow("image with feature bboxes", image)
         key = cv2.waitKey()
         if key == ord('q'):

@@ -14,8 +14,8 @@ class ExampleMaker:
         self.anchors_pixel = cfg.Model.ANCHORS_PIXEL
         self.preprocess_example = pr.ExamplePreprocess(target_hw=dataset_cfg.INPUT_RESOLUTION,
                                                        dataset_cfg=dataset_cfg,
-                                                       category_names=cfg.Dataset.CATEGORY_NAMES,
-                                                       max_bbox=cfg.Dataset.MAX_BBOX_PER_IMAGE,
+                                                       category_names=cfg.Tfrdata.CATEGORY_NAMES,
+                                                       max_bbox=cfg.Tfrdata.MAX_BBOX_PER_IMAGE,
                                                        )
 
     def get_example(self, index):
@@ -75,7 +75,7 @@ class ExampleMaker:
         return gt_features
 
     def show_example(self, example):
-        category_names = cfg.Dataset.CATEGORY_NAMES
+        category_names = cfg.Tfrdata.CATEGORY_NAMES
         image = tu.draw_boxes(example["image"], example["bboxes"], category_names)
         cv2.imshow("image with bboxes", image)
 

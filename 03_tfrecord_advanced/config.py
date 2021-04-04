@@ -7,12 +7,13 @@ class Config:
         RESULT_ROOT = "/home/ian/workspace/detlec/dataset"
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
 
-    class Dataset:
+    class Tfrdata:
         DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
         MAX_BBOX_PER_IMAGE = 20
         CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
         SHARD_SIZE = 2000
 
+    class Datasets:
         # specific dataset configs MUST have the same items with 'Kitti'
         class Kitti:
             NAME = "kitti"
@@ -40,7 +41,7 @@ class Config:
 
     @classmethod
     def get_img_shape(cls, code="HW", dataset="kitti", scale_div=1):
-        dataset_cfg = cls.Dataset.get_dataset_config(dataset)
+        dataset_cfg = cls.Datasets.get_dataset_config(dataset)
         imsize = dataset_cfg.INPUT_RESOLUTION
         if code == "H":
             return imsize[0] // scale_div

@@ -75,7 +75,7 @@ from config import Config as cfg
 
 def test_kitti_reader():
     print("===== start test_kitti_reader")
-    dataset_cfg = cfg.Dataset.Kitti
+    dataset_cfg = cfg.Datasets.Kitti
     drive_mngr = KittiDriveManager(dataset_cfg.PATH, "train")
     drive_paths = drive_mngr.get_drive_paths()
     reader = KittiReader(drive_paths[0], "train", dataset_cfg)
