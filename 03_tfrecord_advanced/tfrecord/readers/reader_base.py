@@ -15,8 +15,9 @@ class DriveManagerBase:
 
 
 class DataReaderBase:
-    def __init__(self, drive_path, split):
+    def __init__(self, drive_path, split, dataset_cfg):
         self.frame_names = self.init_drive(drive_path, split)
+        self.dataset_cfg = dataset_cfg
 
     """
     Public methods used outside this class

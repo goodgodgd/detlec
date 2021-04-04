@@ -1,32 +1,30 @@
 import numpy as np
 import cv2
 
-import util_class as uc
-import util_function as uf
 import tfrecord.tfr_util as tu
 import tfrecord.preprocess as pr
 from config import Config as cfg
 
 
 class ExampleMaker:
-    def __init__(self, data_reader, tfr_hw_shape, dataset_name):
+    def __init__(self, data_reader, dataset_cfg):
         self.data_reader = data_reader
-        self.tfr_hw_shape = tfr_hw_shape
-        self.dataset_name = dataset_name
-        self.max_bbox = cfg.Dataset.MAX_BBOX_PER_IMAGE
         self.feat_scales = cfg.Model.FEATURE_SCALES
         self.feat_order = cfg.Model.FEATURE_ORDER
         self.anchors_pixel = cfg.Model.ANCHORS_PIXEL
-        self.preprocess = pr.ExamplePreprocess(tfr_hw_shape)
+        self.preprocess_example = pr.ExamplePreprocess(target_hw=dataset_cfg.INPUT_RESOLUTION,
+                                                       dataset_cfg=dataset_cfg,
+                                                       category_names=cfg.Dataset.CATEGORY_NAMES,
+                                                       max_bbox=cfg.Dataset.MAX_BBOX_PER_IMAGE,
+                                                       )
 
     def get_example(self, index):
         example = dict()
         example["image"] = self.data_reader.get_image(index)
         raw_hw_shape = example["image"].shape[:2]
         example["bboxes"] = self.data_reader.get_bboxes(index)
-        example = self.preprocess(example)
+        example = self.preprocess_example(example)
         example = self.assign_bbox_over_feature_map(example, raw_hw_shape)
-        example["bboxes"] = self.zeropad_bboxes(example["bboxes"])
         if index % 100 == 10:
             self.show_example(example)
         return example
@@ -37,7 +35,8 @@ class ExampleMaker:
         anchors_ratio = self.anchors_pixel / np.array([raw_hw_shape])
         # feature map sizes are derived from tfrecord image shape
         # feat_sizes: {"feature_l": tfr_hw_shape / 32, ...}
-        feat_sizes = {key: np.array(self.tfr_hw_shape) // scale for key, scale in self.feat_scales.items()}
+        tfr_hw_shape = example["image"].shape[:2]
+        feat_sizes = {key: np.array(tfr_hw_shape) // scale for key, scale in self.feat_scales.items()}
         gt_features = self.make_gt_feature_map(example["bboxes"], anchors_ratio, feat_sizes, self.feat_order)
         example.update(gt_features)
         return example
@@ -75,16 +74,9 @@ class ExampleMaker:
             gt_features[feat_name] = feat_map
         return gt_features
 
-    def zeropad_bboxes(self, bboxes):
-        if bboxes.shape[0] < self.max_bbox:
-            new_bboxes = np.zeros((self.max_bbox, 5), dtype=np.float32)
-            new_bboxes[:bboxes.shape[0]] = bboxes
-            return new_bboxes
-        else:
-            return bboxes
-
     def show_example(self, example):
-        image = tu.draw_boxes(example["image"], example["bboxes"], cfg.Dataset.CATEGORY_NAMES[self.dataset_name])
+        category_names = cfg.Dataset.CATEGORY_NAMES
+        image = tu.draw_boxes(example["image"], example["bboxes"], category_names)
         cv2.imshow("image with bboxes", image)
 
         features = []
@@ -93,7 +85,7 @@ class ExampleMaker:
             feature = feature[feature[..., 4] > 0]      # objectness == 1
             features.append(feature)
         feat_boxes = np.concatenate(features, axis=0)
-        image = tu.draw_boxes(example["image"], feat_boxes, cfg.Dataset.CATEGORY_NAMES[self.dataset_name])
+        image = tu.draw_boxes(example["image"], feat_boxes, category_names)
         cv2.imshow("image with feature bboxes", image)
         cv2.waitKey(100)
 

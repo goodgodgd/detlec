@@ -14,20 +14,20 @@ from tfrecord.example_maker import ExampleMaker
 import tfrecord.tfr_util as tu
 
 
-def drive_manager_factory(dataset, split, srcpath):
-    if dataset == "kitti":
+def drive_manager_factory(dataset_name, split, srcpath):
+    if dataset_name == "kitti":
         from tfrecord.readers.kitti_reader import KittiDriveManager
         return KittiDriveManager(srcpath, split)
     else:
-        assert 0, f"[drive_manager_factory] invalid dataset name: {dataset}"
+        assert 0, f"[drive_manager_factory] invalid dataset name: {dataset_name}"
 
 
-def drive_reader_factory(dataset, split, drive_path):
-    if dataset == "kitti":
+def drive_reader_factory(dataset_cfg, split, drive_path):
+    if dataset_cfg.NAME == "kitti":
         from tfrecord.readers.kitti_reader import KittiReader
-        return KittiReader(drive_path, split)
+        return KittiReader(drive_path, split, dataset_cfg)
     else:
-        assert 0, f"[drive_reader_factory] invalid dataset name: {dataset}"
+        assert 0, f"[drive_reader_factory] invalid dataset name: {dataset_cfg.NAME}"
 
 
 class TfrecordMaker:
@@ -36,15 +36,13 @@ class TfrecordMaker:
     get raw examples from ExampleMaker and convert them into tf.data.Example
     serialize examples and write serialized data into tfrecord files
     """
-    def __init__(self, dataset, split, srcpath, tfrpath, hw_shape,
-                 shard_size=2000, drive_example_limit=0, total_example_limit=0):
-        self.dataset = dataset              # dataset name e.g. "kitti"
+    def __init__(self, dataset_cfg, split, tfrpath, shard_size,
+                 drive_example_limit=0, total_example_limit=0):
+        self.dataset_cfg = dataset_cfg
         self.split = split                  # split name e.g. "train", "val", "test
-        self.srcpath = srcpath              # raw data path
         self.tfrpath__ = tfrpath + "__"     # temporary path to write tfrecord
         self.tfrpath = tfrpath              # path to save final tfrecord
         self.tfr_drive_path = ""            # path to write current drive's tfrecord
-        self.hw_shape = hw_shape            # (height width) of image to be saved in tfrecord
         self.shard_size = shard_size        # max number of examples in a shard
         self.drive_example_limit = drive_example_limit
         self.total_example_limit = total_example_limit
@@ -56,13 +54,13 @@ class TfrecordMaker:
         self.total_example_count = 0        # number of examples in this dataset
         self.error_count = 0
         # objects
-        self.drive_manger = drive_manager_factory(dataset, split, srcpath)
+        self.drive_manger = drive_manager_factory(dataset_cfg.NAME, split, dataset_cfg.PATH)
         self.serializer = tu.TfrSerializer()
         self.writer = None
         self.path_manager = uc.PathManager([""])
 
     def make(self):
-        print("\n\n========== Start dataset:", self.dataset)
+        print("\n\n========== Start dataset:", self.dataset_cfg.NAME)
         drive_paths = self.drive_manger.get_drive_paths()
         with uc.PathManager(self.tfrpath__, closer_func=self.on_exit) as path_manager:
             self.path_manager = path_manager
@@ -105,8 +103,8 @@ class TfrecordMaker:
         self.writer = tf.io.TFRecordWriter(outfile)
 
     def write_drive(self, drive_path):
-        data_reader = drive_reader_factory(self.dataset, self.split, drive_path)
-        example_maker = ExampleMaker(data_reader, self.hw_shape, self.dataset)
+        data_reader = drive_reader_factory(self.dataset_cfg, self.split, drive_path)
+        example_maker = ExampleMaker(data_reader, self.dataset_cfg)
         num_drive_frames = data_reader.num_frames()
         drive_example = {}
 

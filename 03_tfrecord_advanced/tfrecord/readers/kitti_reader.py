@@ -6,7 +6,6 @@ import cv2
 from tfrecord.readers.reader_base import DataReaderBase, DriveManagerBase
 import tfrecord.tfr_util as tu
 import util_class as uc
-from config import Config as cfg
 
 
 class KittiDriveManager(DriveManagerBase):
@@ -22,8 +21,8 @@ class KittiDriveManager(DriveManagerBase):
 
 
 class KittiReader(DataReaderBase):
-    def __init__(self, drive_path, split):
-        super().__init__(drive_path, split)
+    def __init__(self, drive_path, split, dataset_cfg):
+        super().__init__(drive_path, split, dataset_cfg)
 
     """
     Public methods used outside this class
@@ -59,9 +58,9 @@ class KittiReader(DataReaderBase):
     def extract_box(self, line):
         raw_label = line.strip("\n").split(" ")
         category_name = raw_label[0]
-        if category_name not in cfg.Dataset.CATEGORY_NAMES["kitti"]:
+        if category_name not in self.dataset_cfg.CATEGORIES_TO_USE:
             return None
-        category_index = cfg.Dataset.CATEGORY_NAMES["kitti"].index(category_name)
+        category_index = self.dataset_cfg.CATEGORIES_TO_USE.index(category_name)
         y1 = round(float(raw_label[5]))
         x1 = round(float(raw_label[4]))
         y2 = round(float(raw_label[7]))
@@ -71,18 +70,20 @@ class KittiReader(DataReaderBase):
 
 
 # ==================================================
+from config import Config as cfg
+
 
 def test_kitti_reader():
     print("===== start test_kitti_reader")
-    kitti_path = "/media/ian/Ian4T/dataset/kitti_detection"
-    drive_mngr = KittiDriveManager(kitti_path, "train")
+    dataset_cfg = cfg.Dataset.Kitti
+    drive_mngr = KittiDriveManager(dataset_cfg.PATH, "train")
     drive_paths = drive_mngr.get_drive_paths()
-    reader = KittiReader(drive_paths[0], "train")
+    reader = KittiReader(drive_paths[0], "train", dataset_cfg)
     for i in range(reader.num_frames()):
         image = reader.get_image(i)
         bboxes = reader.get_bboxes(i)
         print(f"frame {i}, bboxes:\n", bboxes)
-        boxed_image = tu.draw_boxes(image, bboxes, cfg.Dataset.CATEGORY_NAMES["kitti"])
+        boxed_image = tu.draw_boxes(image, bboxes, dataset_cfg.CATEGORIES_TO_USE)
         cv2.imshow("kitti", boxed_image)
         key = cv2.waitKey()
         if key == ord('q'):

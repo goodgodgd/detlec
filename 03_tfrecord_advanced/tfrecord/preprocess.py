@@ -11,12 +11,14 @@ class PreprocessBase:
 
 
 class ExamplePreprocess(PreprocessBase):
-    def __init__(self, target_hw, crop_offset=None):
-        # crop offset: dy1, dx1, dy2, dx2 (top, left, bottom, right)
-        crop_offset = [0, 0, 0, 0] if crop_offset is None else crop_offset
-        self.preprocess = [ExampleCropper(target_hw, crop_offset), 
+    def __init__(self, target_hw, dataset_cfg, category_names, max_bbox):
+        self.preprocess = [ExampleCropper(target_hw, dataset_cfg.CROP_TLBR),
                            ExampleResizer(target_hw),   # box in pixel scale
-                           ExampleBoxScaler()]          # box in (0~1) scale
+                           ExampleBoxScaler(),          # box in (0~1) scale
+                           ExampleCategoryRemapper(dataset_cfg.CATEGORIES_TO_USE,
+                                                   dataset_cfg.CATEGORY_REMAP, category_names),
+                           ExampleZeroPadBbox(max_bbox)
+                           ]
     
     def __call__(self, example):
         for process in self.preprocess:
@@ -115,3 +117,49 @@ class ExampleBoxScaler(PreprocessBase):
         bboxes = example["bboxes"].astype(np.float32)
         bboxes[:, :4] /= np.array([height, width, height, width])
         return {"image": example["image"], "bboxes": bboxes}
+
+
+class ExampleCategoryRemapper(PreprocessBase):
+    INVALID_CATEGORY = -1
+
+    def __init__(self, src_categories, src_renamer, dst_categories):
+        self.category_remap = self.make_category_remap(src_categories, src_renamer, dst_categories)
+
+    def make_category_remap(self, src_categories, src_renamer, dst_categories):
+        # replace src_categories by src_renamer
+        renamed_categories = [src_renamer[categ] if categ in src_renamer else categ for categ in src_categories]
+        remap = dict()
+        for si, categ in enumerate(renamed_categories):
+            if categ in dst_categories:
+                # category index mapping between renamed_categories and dst_categories
+                remap[si] = dst_categories.index(categ)
+            else:
+                remap[si] = self.INVALID_CATEGORY
+        print("[make_category_remap] remap=", remap)
+        return remap
+
+    def __call__(self, example):
+        old_categs = example["bboxes"][:, 4]
+        new_categs = old_categs.copy()
+        # replace category indices by category_remap
+        for key, val in self.category_remap.items():
+            new_categs[old_categs == key] = val
+        example["bboxes"][:, 4] = new_categs
+        # filter out invalid category
+        example["bboxes"] = example["bboxes"][new_categs != self.INVALID_CATEGORY, :]
+        return example
+
+
+class ExampleZeroPadBbox:
+    def __init__(self, max_bbox):
+        self.max_bbox = max_bbox
+
+    def __call__(self, example):
+        bboxes = example["bboxes"]
+        if bboxes.shape[0] < self.max_bbox:
+            new_bboxes = np.zeros((self.max_bbox, 5), dtype=np.float32)
+            new_bboxes[:bboxes.shape[0]] = bboxes
+            example["bboxes"] = new_bboxes
+        return example
+
+
