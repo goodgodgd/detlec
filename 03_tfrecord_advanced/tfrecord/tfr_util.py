@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import tensorflow as tf
 
-import util_function as uf
+import utils.util_function as uf
 
 
 class TfrSerializer:

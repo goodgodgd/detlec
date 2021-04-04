@@ -5,7 +5,7 @@ import cv2
 
 from tfrecord.readers.reader_base import DataReaderBase, DriveManagerBase
 import tfrecord.tfr_util as tu
-import util_class as uc
+import utils.util_class as uc
 
 
 class KittiDriveManager(DriveManagerBase):

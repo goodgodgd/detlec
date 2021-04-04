@@ -7,11 +7,6 @@ class MyExceptionToCatch(Exception):
         super().__init__(msg)
 
 
-class WrongInputException(Exception):
-    def __init__(self, msg):
-        super().__init__(msg)
-
-
 class PathManager:
     def __init__(self, path, closer_func=None):
         self.path = path

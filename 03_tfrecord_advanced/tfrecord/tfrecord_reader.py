@@ -5,7 +5,7 @@ import cv2
 
 import settings
 from config import Config as cfg
-import util_function as uf
+import utils.util_function as uf
 
 
 class TfrecordReader:

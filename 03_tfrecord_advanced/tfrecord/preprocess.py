@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 
-import util_class as uc
-import util_function as uf
+import utils.util_class as uc
+import utils.util_function as uf
 
 
 class PreprocessBase:

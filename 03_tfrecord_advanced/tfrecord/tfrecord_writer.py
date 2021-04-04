@@ -8,8 +8,8 @@ from glob import glob
 import shutil
 from timeit import default_timer as timer
 
-import util_class as uc
-import util_function as uf
+import utils.util_class as uc
+import utils.util_function as uf
 from tfrecord.example_maker import ExampleMaker
 import tfrecord.tfr_util as tu
 

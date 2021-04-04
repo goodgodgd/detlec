@@ -14,7 +14,7 @@ class Config:
         SHARD_SIZE = 2000
 
     class Datasets:
-        # specific dataset configs MUST have the same items with 'Kitti'
+        # specific dataset configs MUST have the same items
         class Kitti:
             NAME = "kitti"
             PATH = "/media/ian/Ian4T/dataset/kitti_detection"
@@ -43,6 +43,7 @@ class Config:
     def get_img_shape(cls, code="HW", dataset="kitti", scale_div=1):
         dataset_cfg = cls.Datasets.get_dataset_config(dataset)
         imsize = dataset_cfg.INPUT_RESOLUTION
+        code = code.upper()
         if code == "H":
             return imsize[0] // scale_div
         elif code == "W":
