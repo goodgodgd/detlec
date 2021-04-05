@@ -7,6 +7,10 @@ import utils.util_function as uf
 
 class PreprocessBase:
     def __call__(self, example):
+        """
+        :param example: source example
+        :return: preprocessed example
+        """
         raise NotImplementedError()
 
 
@@ -16,7 +20,8 @@ class ExamplePreprocess(PreprocessBase):
                            ExampleResizer(target_hw),   # box in pixel scale
                            ExampleBoxScaler(),          # box in (0~1) scale
                            ExampleCategoryRemapper(dataset_cfg.CATEGORIES_TO_USE,
-                                                   dataset_cfg.CATEGORY_REMAP, category_names),
+                                                   dataset_cfg.CATEGORY_REMAP,
+                                                   category_names),
                            ExampleZeroPadBbox(max_bbox)
                            ]
     

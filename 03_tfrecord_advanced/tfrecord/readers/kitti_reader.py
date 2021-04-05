@@ -3,7 +3,7 @@ import numpy as np
 from glob import glob
 import cv2
 
-from tfrecord.readers.reader_base import DataReaderBase, DriveManagerBase
+from tfrecord.readers.reader_base import DatasetReaderBase, DriveManagerBase
 import tfrecord.tfr_util as tu
 import utils.util_class as uc
 
@@ -20,7 +20,7 @@ class KittiDriveManager(DriveManagerBase):
         return f"train"
 
 
-class KittiReader(DataReaderBase):
+class KittiReader(DatasetReaderBase):
     def __init__(self, drive_path, split, dataset_cfg):
         super().__init__(drive_path, split, dataset_cfg)
 

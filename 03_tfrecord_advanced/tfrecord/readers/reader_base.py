@@ -14,19 +14,16 @@ class DriveManagerBase:
         raise NotImplementedError()
 
 
-class DataReaderBase:
+class DatasetReaderBase:
     def __init__(self, drive_path, split, dataset_cfg):
         self.frame_names = self.init_drive(drive_path, split)
         self.dataset_cfg = dataset_cfg
 
-    """
-    Public methods used outside this class
-    """
     def init_drive(self, drive_path, split):
         """
-        :param drive_path: path to data of a drive
+        :param drive_path: path to the specific drive folder
         :param split: train/val/test
-        reset variables for a new sequence like intrinsic, extrinsic, and last index
+        reset variables and list frame files in the drive
         """
         raise NotImplementedError()
 
@@ -35,19 +32,14 @@ class DataReaderBase:
 
     def get_image(self, index):
         """
-        :return: 'undistorted' indexed image in the current sequence
+        :param index: image index in self.frame_names
+        :return: image, np.uint8
         """
         raise NotImplementedError()
 
     def get_bboxes(self, index):
         """
-        :return: bounding box (x1, y1, x2, y2, category_index)
+        :param index: image index in self.frame_names
+        :return: bounding box in the indexed image (y, x, h, w, category_index), np.int32
         """
         raise NotImplementedError()
-
-    def map_category(self, srclabel):
-        """
-        :return: convert srclabel to category index
-        """
-        raise NotImplementedError()
-
