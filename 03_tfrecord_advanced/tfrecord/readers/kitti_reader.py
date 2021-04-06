@@ -17,7 +17,7 @@ class KittiDriveManager(DriveManagerBase):
         return [op.join(self.datapath, kitti_split, "image_2")]
 
     def get_drive_name(self, drive_index):
-        return f"train"
+        return self.split
 
 
 class KittiReader(DatasetReaderBase):

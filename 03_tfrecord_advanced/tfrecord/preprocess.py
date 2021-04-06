@@ -22,7 +22,7 @@ class ExamplePreprocess(PreprocessBase):
                            ExampleCategoryRemapper(dataset_cfg.CATEGORIES_TO_USE,
                                                    dataset_cfg.CATEGORY_REMAP,
                                                    category_names),
-                           ExampleZeroPadBbox(max_bbox)
+                           ExampleZeroPadBbox(max_bbox),
                            ]
     
     def __call__(self, example):
@@ -155,7 +155,7 @@ class ExampleCategoryRemapper(PreprocessBase):
         return example
 
 
-class ExampleZeroPadBbox:
+class ExampleZeroPadBbox(PreprocessBase):
     def __init__(self, max_bbox):
         self.max_bbox = max_bbox
 
