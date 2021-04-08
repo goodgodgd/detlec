@@ -20,7 +20,7 @@ class Config:
             PATH = "/media/ian/Ian4T/dataset/kitti_detection"
             CATEGORIES_TO_USE = ["Pedestrian", "Car", "Van", "Truck", "Cyclist"]
             CATEGORY_REMAP = {"Pedestrian": "Person", "Cyclist": "Bicycle"}
-            INPUT_RESOLUTION = (256, 832)
+            INPUT_RESOLUTION = (256, 832)   # (4,13) * 64
             CROP_TLBR = [0, 0, 0, 0]        # crop [top, left, bottom, right] or [y1 x1 y2 x2]
 
         DATASET_CONFIGS = {"kitti": Kitti}
