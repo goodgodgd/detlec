@@ -24,9 +24,6 @@ class KittiReader(DatasetReaderBase):
     def __init__(self, drive_path, split, dataset_cfg):
         super().__init__(drive_path, split, dataset_cfg)
 
-    """
-    Public methods used outside this class
-    """
     def init_drive(self, drive_path, split):
         frame_names = glob(op.join(drive_path, "*.png"))
         frame_names.sort()

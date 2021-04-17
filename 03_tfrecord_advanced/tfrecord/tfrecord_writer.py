@@ -66,7 +66,7 @@ class TfrecordMaker:
             self.path_manager = path_manager
             for self.drive_index, drive_path in enumerate(drive_paths):
                 print(f"\n==== Start drive-{self.drive_index}:", drive_path)
-                # skip if drive_path has been converted to tfrecord
+                # skip if drive_path has been completed
                 if self.init_drive_tfrecord():
                     continue
                 # stop if number of total frame exceeds the limit
@@ -87,7 +87,6 @@ class TfrecordMaker:
             print(f"[init_drive_tfrecord] {op.basename(tfr_drive_path)} exists. move onto the next")
             return True
 
-        # change path to check date integrity
         self.path_manager.reopen(tfr_drive_path, closer_func=self.on_exit)
         self.tfr_drive_path = tfr_drive_path
         self.shard_index = 0
@@ -118,7 +117,7 @@ class TfrecordMaker:
             try:
                 example = example_maker.get_example(index)
                 drive_example = self.verify_example(drive_example, example)
-            except StopIteration as si:  # raised from xxx_reader._get_frame()
+            except StopIteration as si:     # raised from next()
                 print("\n==[write_drive][StopIteration] stop this drive\n", si)
                 break
             except uc.MyExceptionToCatch as me:  # raised from xxx_reader._get_frame()

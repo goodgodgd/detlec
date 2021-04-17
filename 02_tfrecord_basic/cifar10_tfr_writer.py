@@ -146,3 +146,4 @@ class TfrSerializer:
 
 if __name__ == "__main__":
     write_cifar10_tfrecord()
+
