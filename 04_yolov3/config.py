@@ -1,11 +1,13 @@
 import os.path as op
 import numpy as np
+from parameters import ParameterPool
 
 
 class Config:
     class Paths:
         RESULT_ROOT = "/home/ian/workspace/detlec/dataset"
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
+        CHECK_POINT = op.join(RESULT_ROOT, "ckpt")
 
     class Tfrdata:
         DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
@@ -30,14 +32,29 @@ class Config:
             return cls.DATASET_CONFIGS[dataset]
 
     class Model:
-        FEATURE_SCALES = {"feature_l": 32, "feature_m": 16, "feature_s": 8}
-        FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
-        ANCHORS_PIXEL = np.array([[13, 10], [30, 16], [23, 33],
-                                  [61, 30], [45, 62], [119, 59],
-                                  [90, 116], [198, 156], [326, 373]])
+        class Output:
+            FEATURE_SCALES = {"feature_l": 32, "feature_m": 16, "feature_s": 8}
+            FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
+            ANCHORS_PIXEL = ParameterPool.ANCHOR.COCO
+
+        class Composition:
+            BACKBONE = "darknet53"
+            HEAD = "FPN"
+            CONV_ARGS = {"activation": "leaky_relu", "activation_param": 0.1}
 
     class Train:
+        CKPT_NAME = "yolo"
+        MODE = ["eager", "graph"][0]
         BATCH_SIZE = 2
+        TRAINING_PLAN = [
+            ("kitti", 10, 0.0001, ParameterPool.LOSS.STANDARD, True),
+            ("kitti", 10, 0.00001, ParameterPool.LOSS.STANDARD, True)
+        ]
+
+    @staticmethod
+    def config_summary():
+        # return dict of important parameters
+        pass
 
     @classmethod
     def get_img_shape(cls, code="HW", dataset="kitti", scale_div=1):

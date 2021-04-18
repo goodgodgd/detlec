@@ -9,9 +9,9 @@ from config import Config as cfg
 class ExampleMaker:
     def __init__(self, data_reader, dataset_cfg):
         self.data_reader = data_reader
-        self.feat_scales = cfg.Model.FEATURE_SCALES
-        self.feat_order = cfg.Model.FEATURE_ORDER
-        self.anchors_pixel = cfg.Model.ANCHORS_PIXEL
+        self.feat_scales = cfg.Model.Output.FEATURE_SCALES
+        self.feat_order = cfg.Model.Output.FEATURE_ORDER
+        self.anchors_pixel = cfg.Model.Output.ANCHORS_PIXEL
         self.preprocess_example = pr.ExamplePreprocess(target_hw=dataset_cfg.INPUT_RESOLUTION,
                                                        dataset_cfg=dataset_cfg,
                                                        category_names=cfg.Tfrdata.CATEGORY_NAMES,
@@ -80,7 +80,7 @@ class ExampleMaker:
         cv2.imshow("image with bboxes", image)
 
         features = []
-        for feat_name in cfg.Model.FEATURE_ORDER:
+        for feat_name in cfg.Model.Output.FEATURE_ORDER:
             feature = example[feat_name]
             feature = feature[feature[..., 4] > 0]      # objectness == 1
             features.append(feature)

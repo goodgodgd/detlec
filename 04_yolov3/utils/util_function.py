@@ -1,6 +1,5 @@
 import sys
 import tensorflow as tf
-import numpy as np
 
 
 def print_progress(status_msg):
