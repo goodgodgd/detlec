@@ -8,7 +8,7 @@ class Config:
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
 
     class Tfrdata:
-        DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
+        DATASETS_FOR_TFRECORD = {"kitti": ("train", "val"),}
         MAX_BBOX_PER_IMAGE = 20
         CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
         SHARD_SIZE = 2000
@@ -58,5 +58,4 @@ class Config:
             return cls.Train.BATCH_SIZE, imsize[0] // scale_div, imsize[1] // scale_div, 3
         else:
             assert 0, f"Invalid code: {code}"
-
 

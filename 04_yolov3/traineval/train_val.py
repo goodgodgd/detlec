@@ -1,7 +1,6 @@
 import tensorflow as tf
 
 import time
-import os.path as op
 import utils.util_function as uf
 
 

@@ -84,7 +84,7 @@ import tfrecord.tfr_util as tu
 
 def test_read_dataset():
     print("===== start test_read_dataset")
-    dataset = TfrecordReader(op.join(cfg.Paths.TFRECORD, "kitti_train")).get_dataset()
+    dataset = TfrecordReader(op.join(cfg.Paths.TFRECORD, "kitti_train"), batch_size=4).get_dataset()
     for i, x in enumerate(dataset):
         print(f"=== index: {i}, image={x['image'].shape}, bbox={x['bboxes'].shape}"
               f", feature_l={x['feature_l'].shape}, feature_s={x['feature_s'].shape}")

@@ -1,5 +1,4 @@
 import os.path as op
-import numpy as np
 from parameters import ParameterPool
 
 
@@ -26,6 +25,7 @@ class Config:
             CROP_TLBR = [0, 0, 0, 0]        # crop [top, left, bottom, right] or [y1 x1 y2 x2]
 
         DATASET_CONFIGS = {"kitti": Kitti}
+        TARGET_DATASET = "kitti"
 
         @classmethod
         def get_dataset_config(cls, dataset):
@@ -33,12 +33,15 @@ class Config:
 
     class Model:
         class Output:
-            FEATURE_SCALES = {"feature_l": 32, "feature_m": 16, "feature_s": 8}
+            FEATURE_SCALES = {"feature_s": 8, "feature_m": 16, "feature_l": 32}
             FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
-            ANCHORS_PIXEL = ParameterPool.ANCHOR.COCO
+            ANCHORS_PIXEL = None    # assigned by set_anchors()
+            ANCHORS_PER_SCALE = 3
+            OUT_CHANNELS = 0        # assigned by set_out_channel()
+            OUT_COMPOSITION = ()    # assigned by set_out_channel()
 
-        class Composition:
-            BACKBONE = "darknet53"
+        class Structure:
+            BACKBONE = "Darknet53"
             HEAD = "FPN"
             CONV_ARGS = {"activation": "leaky_relu", "activation_param": 0.1}
 
@@ -77,3 +80,20 @@ class Config:
             assert 0, f"Invalid code: {code}"
 
 
+def set_anchors():
+    basic_anchor = ParameterPool.AnchorRatio.COCO
+    target_dataset = Config.Datasets.TARGET_DATASET
+    dataset_cfg = Config.Datasets.get_dataset_config(target_dataset)
+    scale = min(dataset_cfg.INPUT_RESOLUTION)
+    Config.Model.Output.ANCHORS_PIXEL = basic_anchor * scale
+    print("[set_anchors] anchors:", Config.Model.Output.ANCHORS_PIXEL)
+
+
+def set_out_channel():
+    num_cats = len(Config.Tfrdata.CATEGORY_NAMES)
+    Config.Model.Output.OUT_COMPOSITION = [('yxhw', 4), ('object', 1), ('cat_pr', num_cats)]
+    Config.Model.Output.OUT_CHANNELS = sum([val for key, val in Config.Model.Output.OUT_COMPOSITION])
+
+
+set_anchors()
+set_out_channel()

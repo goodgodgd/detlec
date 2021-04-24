@@ -1,30 +1,31 @@
 import os
 import os.path as op
 import tensorflow as tf
-import settings
 import numpy as np
 import pandas as pd
 
 from config import Config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
+from model.model_factory import ModelFactory
 import traineval.train_val as tv
+import settings
 
 
-def main():
+def train_main():
     set_gpu_configs()
     np.set_printoptions(precision=4, suppress=True, linewidth=100)
     for plan in cfg.Train.TRAINING_PLAN:
-        train(plan)
+        train_by_plan(plan)
 
 
-def train(plan):
+def train_by_plan(plan):
     dataset_name, epochs, learning_rate, loss_weights, model_save = plan
     batch_size = cfg.Train.BATCH_SIZE
     initial_epoch = read_previous_epoch()
 
-    dataset_train, train_steps = get_dataset(dataset_name, False, batch_size, "train")
-    dataset_val, val_steps = get_dataset(dataset_name, False, batch_size, "val")
-    model, loss, optimizer = create_training_parts(batch_size, learning_rate, loss_weights, dataset_name)
+    dataset_train, train_steps, imshape = get_dataset(dataset_name, False, batch_size, "train")
+    dataset_val, val_steps, _ = get_dataset(dataset_name, False, batch_size, "val")
+    model, loss, optimizer = create_training_parts(batch_size, imshape, learning_rate, loss_weights, dataset_name)
     trainer = tv.trainer_factory(cfg.Train.MODE, model, loss, optimizer, train_steps)
     validater = tv.validater_factory(cfg.Train.MODE, model, loss, val_steps)
     end_epoch = initial_epoch + epochs
@@ -47,13 +48,13 @@ def get_dataset(dataset_name, shuffle, batch_size, split):
     frames = reader.get_total_frames()
     image_shape = reader.get_tfr_config()["image"]["shape"]
     print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, frames={frames}")
-    return dataset, frames // batch_size
+    return dataset, frames // batch_size, image_shape
 
 
-def create_training_parts(batch_size, learning_rate, loss_weights, dataset_name, weight_suffix='latest'):
-    model = ModelFactory(batch_size, cfg.Model).get_model()
+def create_training_parts(batch_size, imshape, learning_rate, loss_weights, dataset_name, weight_suffix='latest'):
+    model = ModelFactory(batch_size, imshape, cfg.Model).get_model()
     model = try_load_weights(model, weight_suffix)
-    loss_object = LossFactory(loss_weights, dataset_name)
+    loss_object = LossFactory(loss_weights, dataset_name).get_loss()
     optimizer = tf.optimizers.Adam(lr=learning_rate)
     return model, loss_object, optimizer
 
@@ -110,4 +111,4 @@ def set_gpu_configs():
 
 
 if __name__ == "__main__":
-    main()
+    train_main()
