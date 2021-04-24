@@ -32,7 +32,7 @@ class HeadBase:
 
     def make_result(self, x, channel):
         x = self.conv2d(x, channel)
-        anchors, anc_channels = self.model_cfg.Output.ANCHORS_PER_SCALE, self.model_cfg.Output.OUT_CHANNELS
+        anchors, anc_channels = self.model_cfg.Output.NUM_ANCHORS_PER_SCALE, self.model_cfg.Output.OUT_CHANNELS
         x = self.conv2d_result(x, anchors, anc_channels)
         batch, height, width, channel = x.shape
         x_5d = tf.reshape(x, (batch, height, width, anchors, anc_channels))
@@ -68,8 +68,13 @@ class FPN(HeadBase):
 
 
 class FeatureDecoder:
-    def __init__(self, model_cfg):
+    def __init__(self, model_cfg, anchors_per_scale):
+        """
+        :param model_cfg: Config.Model
+        :param anchors_per_scale: e.g. {"anchor_s": [[8.0, 6.2], [18.5, 9.8], [14.2, 20.3]], ...}
+        """
         self.model_cfg = model_cfg
+        self.anchors_per_scale = anchors_per_scale
 
     def __call__(self, feature, scale_name: str):
         """
@@ -78,8 +83,8 @@ class FeatureDecoder:
         :return: decoded feature e.g. (yxhw, objectness, category probabilities)
         """
         slices = mu.slice_features(feature, self.model_cfg.Output.OUT_COMPOSITION)
-        anchors = self.get_feature_anchors(feature, scale)
-        box_yx, box_hw = self.decode_box(slices["yxhw"])
+        anchors = self.anchors_per_scale[scale_name.replace("feature", "anchor")]
+        box_yx, box_hw = self.decode_box(slices["yxhw"], anchors)
 
         anchors_h = anchors[:, 0:1] / cfg.INPUT_SHAPE[0]
         anchors_w = anchors[:, 1:2] / cfg.INPUT_SHAPE[1]
@@ -106,7 +111,7 @@ class FeatureDecoder:
     def get_feature_anchors(self, feature, scale):
         pass
 
-    def decode_box(self, yxhw_raw):
+    def decode_box(self, yxhw_raw, anchors):
         """
         :param yxhw_raw: (batch, grid_h, grid_w, 4)
         :return: (batch, grid_h, grid_w, 2), (batch, grid_h, grid_w, 2)

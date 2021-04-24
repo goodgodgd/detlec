@@ -12,6 +12,7 @@ import utils.util_class as uc
 import utils.util_function as uf
 from tfrecord.example_maker import ExampleMaker
 import tfrecord.tfr_util as tu
+from config import Config as cfg
 
 
 def drive_manager_factory(dataset_name, split, srcpath):
@@ -37,7 +38,9 @@ class TfrecordMaker:
     serialize examples and write serialized data into tfrecord files
     """
     def __init__(self, dataset_cfg, split, tfrpath, shard_size,
-                 drive_example_limit=0, total_example_limit=0):
+                 drive_example_limit=0,
+                 total_example_limit=0,
+                 anchors_pixel=cfg.Tfrdata.ANCHORS_PIXEL):
         self.dataset_cfg = dataset_cfg
         self.split = split                  # split name e.g. "train", "val", "test
         self.tfrpath__ = tfrpath + "__"     # temporary path to write tfrecord
@@ -58,6 +61,11 @@ class TfrecordMaker:
         self.serializer = tu.TfrSerializer()
         self.writer = None
         self.path_manager = uc.PathManager([""])
+        # anchors per scale
+        anchors = dict()
+        for i, feat_name in enumerate(cfg.Model.Output.FEATURE_ORDER):
+            anchors[feat_name.replace("feature", "anchor")] = anchors_pixel[i * 3:i * 3 + 3].tolist()
+        self.anchors_per_scale = anchors
 
     def make(self):
         print("\n\n========== Start dataset:", self.dataset_cfg.NAME)
@@ -172,6 +180,7 @@ class TfrecordMaker:
     def write_tfrecord_config(self, example):
         assert ('image' in example) and (example['image'] is not None)
         config = tu.inspect_properties(example)
+        config.update(self.anchors_per_scale)
         config["length"] = self.drive_example_count
         print("## save config", config)
         with open(op.join(self.tfr_drive_path, "tfr_config.txt"), "w") as fr:

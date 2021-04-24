@@ -1,5 +1,6 @@
 import os.path as op
 from parameters import ParameterPool
+import numpy as np
 
 
 class Config:
@@ -13,6 +14,7 @@ class Config:
         MAX_BBOX_PER_IMAGE = 20
         CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
         SHARD_SIZE = 2000
+        ANCHORS_PIXEL = None  # assigned by set_anchors()
 
     class Datasets:
         # specific dataset configs MUST have the same items
@@ -35,10 +37,9 @@ class Config:
         class Output:
             FEATURE_SCALES = {"feature_s": 8, "feature_m": 16, "feature_l": 32}
             FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
-            ANCHORS_PIXEL = None    # assigned by set_anchors()
-            ANCHORS_PER_SCALE = 3
-            OUT_CHANNELS = 0        # assigned by set_out_channel()
-            OUT_COMPOSITION = ()    # assigned by set_out_channel()
+            NUM_ANCHORS_PER_SCALE = 3
+            OUT_CHANNELS = 0                    # assigned by set_out_channel()
+            OUT_COMPOSITION = ()                # assigned by set_out_channel()
 
         class Structure:
             BACKBONE = "Darknet53"
@@ -85,8 +86,8 @@ def set_anchors():
     target_dataset = Config.Datasets.TARGET_DATASET
     dataset_cfg = Config.Datasets.get_dataset_config(target_dataset)
     scale = min(dataset_cfg.INPUT_RESOLUTION)
-    Config.Model.Output.ANCHORS_PIXEL = basic_anchor * scale
-    print("[set_anchors] anchors:", Config.Model.Output.ANCHORS_PIXEL)
+    Config.Tfrdata.ANCHORS_PIXEL = np.around(basic_anchor * scale, 1)
+    print("[set_anchors] anchors:", Config.Tfrdata.ANCHORS_PIXEL)
 
 
 def set_out_channel():

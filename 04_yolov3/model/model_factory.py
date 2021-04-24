@@ -4,9 +4,10 @@ import model.head as head
 
 
 class ModelFactory:
-    def __init__(self, batch_size, input_shape, model_cfg):
+    def __init__(self, batch_size, input_shape, anchors_per_scale, model_cfg):
         self.batch_size = batch_size
         self.input_shape = input_shape
+        self.anchors_per_scale = anchors_per_scale
         self.model_cfg = model_cfg
         print(f"[ModelFactory] batch size={batch_size}, input shape={input_shape}")
         print(f"[ModelFactory] backbone={model_cfg.Structure.BACKBONE}, HEAD={model_cfg.Structure.HEAD}")

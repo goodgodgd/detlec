@@ -23,9 +23,10 @@ def train_by_plan(plan):
     batch_size = cfg.Train.BATCH_SIZE
     initial_epoch = read_previous_epoch()
 
-    dataset_train, train_steps, imshape = get_dataset(dataset_name, False, batch_size, "train")
-    dataset_val, val_steps, _ = get_dataset(dataset_name, False, batch_size, "val")
-    model, loss, optimizer = create_training_parts(batch_size, imshape, learning_rate, loss_weights, dataset_name)
+    dataset_train, train_steps, imshape, anchors_per_scale = get_dataset(dataset_name, False, batch_size, "train")
+    dataset_val, val_steps, _, _ = get_dataset(dataset_name, False, batch_size, "val")
+    model, loss, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale,
+                                                   learning_rate, loss_weights, dataset_name)
     trainer = tv.trainer_factory(cfg.Train.MODE, model, loss, optimizer, train_steps)
     validater = tv.validater_factory(cfg.Train.MODE, model, loss, val_steps)
     end_epoch = initial_epoch + epochs
@@ -46,13 +47,16 @@ def get_dataset(dataset_name, shuffle, batch_size, split):
     reader = TfrecordReader(tfrpath, shuffle, batch_size, 1)
     dataset = reader.get_dataset()
     frames = reader.get_total_frames()
-    image_shape = reader.get_tfr_config()["image"]["shape"]
+    tfr_cfg = reader.get_tfr_config()
+    image_shape = tfr_cfg["image"]["shape"]
+    anchors_per_scale = {key: val for key, val in tfr_cfg.items() if key.startswith("anchor")}
     print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, frames={frames}")
-    return dataset, frames // batch_size, image_shape
+    return dataset, frames // batch_size, image_shape, anchors_per_scale
 
 
-def create_training_parts(batch_size, imshape, learning_rate, loss_weights, dataset_name, weight_suffix='latest'):
-    model = ModelFactory(batch_size, imshape, cfg.Model).get_model()
+def create_training_parts(batch_size, imshape, anchors_per_scale, learning_rate,
+                          loss_weights, dataset_name, weight_suffix='latest'):
+    model = ModelFactory(batch_size, imshape, anchors_per_scale, cfg.Model).get_model()
     model = try_load_weights(model, weight_suffix)
     loss_object = LossFactory(loss_weights, dataset_name).get_loss()
     optimizer = tf.optimizers.Adam(lr=learning_rate)
