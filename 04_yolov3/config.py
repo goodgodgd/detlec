@@ -44,7 +44,7 @@ class Config:
         class Structure:
             BACKBONE = "Darknet53"
             HEAD = "FPN"
-            CONV_ARGS = {"activation": "leaky_relu", "activation_param": 0.1}
+            CONV_ARGS = {"activation": "leaky_relu"}
 
     class Train:
         CKPT_NAME = "yolo"

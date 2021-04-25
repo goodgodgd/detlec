@@ -34,7 +34,7 @@ class Darknet53(BackboneBase):
         features = dict()
         conv0 = self.conv2d(input_tensor, 32)
         conv1 = self.conv2d_s2(conv0, 64)
-        conv1 = self.residual(conv1, 32)
+        conv1 = self.residual(conv1, 64)
 
         conv2 = self.conv2d_s2(conv1, 128)
         for i in range(2):

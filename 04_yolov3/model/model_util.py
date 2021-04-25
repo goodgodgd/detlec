@@ -14,7 +14,9 @@ class CustomConv2D:
         self.bn = bn
 
     def __call__(self, x, filters, name=None):
-        name = f"{self.scope}_{name}" if self.scope else name
+        if self.scope is not None:
+            name = self.scope if name is None else f"{self.scope}_{name}"
+
         x = layers.Conv2D(filters, self.kernel_size, self.strides, self.padding,
                           use_bias=not self.bn, kernel_regularizer=tf.keras.regularizers.l2(0.0005),
                           kernel_initializer=tf.random_normal_initializer(stddev=0.01),

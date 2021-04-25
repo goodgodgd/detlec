@@ -18,7 +18,7 @@ class HeadBase:
         self.conv2d = mu.CustomConv2D(kernel_size=3, strides=1, **model_cfg.Structure.CONV_ARGS)
         self.conv2d_k1 = mu.CustomConv2D(kernel_size=1, strides=1, **model_cfg.Structure.CONV_ARGS)
         self.conv2d_s2 = mu.CustomConv2D(kernel_size=3, strides=2, **model_cfg.Structure.CONV_ARGS)
-        self.conv2d_result = mu.CustomConv2D(kernel_size=3, strides=2, bn=False)
+        self.conv2d_result = mu.CustomConv2D(kernel_size=1, strides=1, bn=False)
 
     def __call__(self, input_features):
         raise NotImplementedError()
@@ -34,7 +34,7 @@ class HeadBase:
     def make_result(self, x, channel):
         x = self.conv2d(x, channel)
         anchors, anc_channels = self.model_cfg.Output.NUM_ANCHORS_PER_SCALE, self.model_cfg.Output.OUT_CHANNELS
-        x = self.conv2d_result(x, anchors, anc_channels)
+        x = self.conv2d_result(x, anchors * anc_channels)
         batch, height, width, channel = x.shape
         x_5d = tf.reshape(x, (batch, height, width, anchors, anc_channels))
         return x_5d
