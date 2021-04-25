@@ -49,6 +49,7 @@ def get_dataset(dataset_name, shuffle, batch_size, split):
     frames = reader.get_total_frames()
     tfr_cfg = reader.get_tfr_config()
     image_shape = tfr_cfg["image"]["shape"]
+    # anchor sizes per scale in pixel
     anchors_per_scale = {key: val for key, val in tfr_cfg.items() if key.startswith("anchor")}
     print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, frames={frames}")
     return dataset, frames // batch_size, image_shape, anchors_per_scale
