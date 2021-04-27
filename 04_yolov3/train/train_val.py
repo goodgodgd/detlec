@@ -2,7 +2,7 @@ import tensorflow as tf
 
 import time
 import utils.util_function as uf
-from traineval.logger import ModelLog
+from train.logger import ModelLog
 
 
 def trainer_factory(mode, model, loss, optimizer, steps):

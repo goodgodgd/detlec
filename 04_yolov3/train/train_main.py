@@ -7,9 +7,9 @@ import pandas as pd
 from config import Config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
 from model.model_factory import ModelFactory
-from traineval.loss_factory import LossFactory
-from traineval.logger import Logger
-import traineval.train_val as tv
+from train.loss_factory import LossFactory
+from train.logger import Logger
+import train.train_val as tv
 import utils.util_function as uf
 import settings
 

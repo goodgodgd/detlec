@@ -1,4 +1,4 @@
-import traineval.loss as loss
+import train.loss as loss
 from config import Config as cfg
 
 
