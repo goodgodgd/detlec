@@ -2,24 +2,25 @@ import tensorflow as tf
 
 import time
 import utils.util_function as uf
+from traineval.logger import ModelLog
 
 
 def trainer_factory(mode, model, loss, optimizer, steps):
     if mode == "eager":
-        return ModelTrainerEager(model, loss, optimizer, steps)
+        return ModelEagerTrainer(model, loss, optimizer, steps)
     elif mode == "graph":
-        return ModelTrainerGraph(model, loss, optimizer, steps)
+        return ModelGraphTrainer(model, loss, optimizer, steps)
 
 
 def validater_factory(mode, model, loss, steps):
     if mode == "eager":
-        return ModelValidaterEager(model, loss, steps)
+        return ModelEagerValidater(model, loss, steps)
     elif mode == "graph":
-        return ModelValidaterGraph(model, loss, steps)
+        return ModelGraphValidater(model, loss, steps)
 
 
 class TrainValBase:
-    def __init__(self, model, loss_object, optimizer=None, epoch_steps=0):
+    def __init__(self, model, loss_object, optimizer, epoch_steps):
         self.model = model
         self.loss_object = loss_object
         self.optimizer = optimizer
@@ -35,6 +36,8 @@ class TrainValBase:
             self.model_log.append_batch_result(outputs)
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
                               f"time={time.time() - start:.2f}... ")
+            if step > 20:
+                break
 
         self.model_log.append_epoch_result(time=time.time() - epoch_start)
         return self.model_log
@@ -43,53 +46,50 @@ class TrainValBase:
         pass
 
 
-class ModelTrainerEager(TrainValBase):
-    def __init__(self, model, loss_object, optimizer=None, epoch_steps=0):
+class ModelEagerTrainer(TrainValBase):
+    def __init__(self, model, loss_object, optimizer, epoch_steps=0):
         super().__init__(model, loss_object, optimizer, epoch_steps)
     
     def run_batch(self, features):
-        pass
+        return self.train_step(features)
+
+    def train_step(self, features):
+        with tf.GradientTape() as tape:
+            preds = self.model(features["image"])
+            total_loss, loss_by_type = self.loss_object(features, preds)
+
+        grads = tape.gradient(total_loss, self.model.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
+        return total_loss, loss_by_type, preds
 
 
-class ModelTrainerGraph(TrainValBase):
-    def __init__(self, model, loss_object, optimizer=None, epoch_steps=0):
+class ModelGraphTrainer(ModelEagerTrainer):
+    def __init__(self, model, loss_object, optimizer, epoch_steps=0):
         super().__init__(model, loss_object, optimizer, epoch_steps)
     
     @tf.function
     def run_batch(self, features):
-        pass
+        return self.train_step(features)
 
 
-class ModelValidaterEager(TrainValBase):
+class ModelEagerValidater(TrainValBase):
     def __init__(self, model, loss_object, epoch_steps=0):
         super().__init__(model, loss_object, None, epoch_steps)
 
     def run_batch(self, features):
-        pass
+        return self.validate_step(features)
+
+    def validate_step(self, features):
+        preds = self.model(features["image"])
+        total_loss, loss_by_type = self.loss_object(features, preds)
+        return total_loss, loss_by_type, preds
 
 
-class ModelValidaterGraph(TrainValBase):
+class ModelGraphValidater(ModelEagerValidater):
     def __init__(self, model, loss_object, epoch_steps=0):
-        super().__init__(model, loss_object, None, epoch_steps)
+        super().__init__(model, loss_object, epoch_steps)
 
     @tf.function
     def run_batch(self, features):
-        pass
-
-
-class ModelLog:
-    def __init__(self):
-        self.frame = dict()
-        self.batch = dict()
-        self.epoch = dict()
-
-    def append_batch_result(self, outputs):
-        pass
-
-    def append_epoch_result(self, **kwargs):
-        pass
-
-    def clear(self):
-        pass
-
+        self.validate_step(features)
 

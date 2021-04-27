@@ -5,7 +5,7 @@ import numpy as np
 
 class Config:
     class Paths:
-        RESULT_ROOT = "/home/ian/workspace/detlec/dataset"
+        RESULT_ROOT = "/home/ian/workspace/detlec/result"
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
         CHECK_POINT = op.join(RESULT_ROOT, "ckpt")
 
@@ -44,7 +44,8 @@ class Config:
         class Structure:
             BACKBONE = "Darknet53"
             HEAD = "FPN"
-            CONV_ARGS = {"activation": "leaky_relu"}
+            BACKBONE_CONV_ARGS = {"activation": "leaky_relu", "scope": "back"}
+            HEAD_CONV_ARGS = {"activation": "leaky_relu", "scope": "head"}
 
     class Train:
         CKPT_NAME = "yolo"

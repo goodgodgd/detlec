@@ -3,7 +3,7 @@ import numpy as np
 
 class ParameterPool:
     class LOSS:
-        STANDARD = {}
+        STANDARD = {"ciou": 1., "objectness": 1., "category": 1.}
 
     class AnchorRatio:
         """

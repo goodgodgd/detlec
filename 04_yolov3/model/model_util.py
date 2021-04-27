@@ -4,6 +4,8 @@ import tensorflow_addons as tfa
 
 
 class CustomConv2D:
+    CALL_COUNT = -1
+
     def __init__(self, kernel_size=3, strides=1, padding="same", activation="leaky_relu", scope=None, bn=True):
         # save arguments for Conv2D layer
         self.kernel_size = kernel_size
@@ -14,8 +16,11 @@ class CustomConv2D:
         self.bn = bn
 
     def __call__(self, x, filters, name=None):
-        if self.scope is not None:
-            name = self.scope if name is None else f"{self.scope}_{name}"
+        CustomConv2D.CALL_COUNT += 1
+        index = CustomConv2D.CALL_COUNT
+        name = f"conv{index:03d}" if name is None else f"{name}/{index:03d}"
+        name = f"{self.scope}/{name}" if self.scope else name
+        print("conv name", name)
 
         x = layers.Conv2D(filters, self.kernel_size, self.strides, self.padding,
                           use_bias=not self.bn, kernel_regularizer=tf.keras.regularizers.l2(0.0005),
