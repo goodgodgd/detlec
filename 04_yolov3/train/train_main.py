@@ -24,12 +24,12 @@ def train_main():
 def train_by_plan(plan):
     dataset_name, epochs, learning_rate, loss_weights, model_save = plan
     batch_size, train_mode = cfg.Train.BATCH_SIZE, cfg.Train.MODE
-    tfr_path, ckpt_path = cfg.Paths.TFRECORD, op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
+    tfrd_path, ckpt_path = cfg.Paths.TFRECORD, op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
     initial_epoch = read_previous_epoch(ckpt_path)
 
     dataset_train, train_steps, imshape, anchors_per_scale = \
-        get_dataset(tfr_path, dataset_name, False, batch_size, "train")
-    dataset_val, val_steps, _, _ = get_dataset(tfr_path, dataset_name, False, batch_size, "val")
+        get_dataset(tfrd_path, dataset_name, False, batch_size, "train")
+    dataset_val, val_steps, _, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
 
     model, loss, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
                                                    learning_rate, loss_weights, dataset_name)
@@ -50,8 +50,8 @@ def train_by_plan(plan):
         save_model_ckpt(ckpt_path, model, f"ep{end_epoch:02d}")
 
 
-def get_dataset(tfr_path, dataset_name, shuffle, batch_size, split):
-    tfrpath = op.join(tfr_path, f"{dataset_name}_{split}")
+def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
+    tfrpath = op.join(tfrd_path, f"{dataset_name}_{split}")
     reader = TfrecordReader(tfrpath, shuffle, batch_size, 1)
     dataset = reader.get_dataset()
     frames = reader.get_total_frames()
@@ -80,7 +80,7 @@ def save_model_ckpt(ckpt_path, model, weights_suffix='latest'):
 
 
 def try_load_weights(ckpt_path, model, weights_suffix='latest'):
-    ckpt_file = op.join(ckpt_path, f"{weights_suffix}.h5")
+    ckpt_file = op.join(ckpt_path, f"yolo_{weights_suffix}.h5")
     if op.isfile(ckpt_file):
         print(f"===== Load weights from checkpoint: {ckpt_file}")
         model.load_weights(ckpt_file)

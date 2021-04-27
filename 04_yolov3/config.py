@@ -1,5 +1,5 @@
 import os.path as op
-from parameters import ParameterPool
+import parameter_pool as params
 import numpy as np
 
 
@@ -51,10 +51,7 @@ class Config:
         CKPT_NAME = "yolo"
         MODE = ["eager", "graph"][0]
         BATCH_SIZE = 2
-        TRAINING_PLAN = [
-            ("kitti", 10, 0.0001, ParameterPool.LOSS.STANDARD, True),
-            ("kitti", 10, 0.00001, ParameterPool.LOSS.STANDARD, True)
-        ]
+        TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
 
     @staticmethod
     def config_summary():
@@ -83,7 +80,7 @@ class Config:
 
 
 def set_anchors():
-    basic_anchor = ParameterPool.AnchorRatio.COCO
+    basic_anchor = params.AnchorRatio.COCO
     target_dataset = Config.Datasets.TARGET_DATASET
     dataset_cfg = Config.Datasets.get_dataset_config(target_dataset)
     scale = min(dataset_cfg.INPUT_RESOLUTION)
