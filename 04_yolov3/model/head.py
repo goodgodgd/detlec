@@ -45,9 +45,9 @@ class FPN(HeadBase):
         super().__init__(model_cfg, num_anchors_per_scale, out_channels)
 
     def __call__(self, input_features):
-        large = input_features["feature_l"]
-        medium = input_features["feature_m"]
-        small = input_features["feature_s"]
+        large = input_features["backbone_l"]
+        medium = input_features["backbone_m"]
+        small = input_features["backbone_s"]
         conv = self.conv_5x(large, 512)
         conv_lbbox = self.make_output(conv, 1024)
 
@@ -57,7 +57,7 @@ class FPN(HeadBase):
 
         conv_small = self.upsample_concat(conv_medium, small, 128)
         conv = self.conv_5x(conv_small, 128)
-        conv_sbbox = self.make_output(conv, 1024)
+        conv_sbbox = self.make_output(conv, 256)
         conv_result = {"feature_l": conv_lbbox, "feature_m": conv_mbbox, "feature_s": conv_sbbox}
         return conv_result
 

@@ -43,17 +43,17 @@ class Darknet53(BackboneBase):
         conv3 = self.conv2d_s2(conv2, 256)
         for i in range(8):
             conv3 = self.residual(conv3, 256)
-        features["feature_s"] = conv3
+        features["backbone_s"] = conv3
 
         conv4 = self.conv2d_s2(conv3, 512)
         for i in range(8):
             conv4 = self.residual(conv4, 512)
-        features["feature_m"] = conv4
+        features["backbone_m"] = conv4
 
         conv5 = self.conv2d_s2(conv4, 1024)
         for i in range(4):
             conv5 = self.residual(conv5, 1024)
-        features["feature_l"] = conv5
+        features["backbone_l"] = conv5
 
         return features
 
