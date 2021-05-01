@@ -16,16 +16,19 @@ import settings
 
 def train_main():
     uf.set_gpu_configs()
-    np.set_printoptions(precision=4, suppress=True, linewidth=100)
-    for plan in cfg.Train.TRAINING_PLAN:
-        train_by_plan(plan)
+    end_epoch = 0
+    for dataset_name, epochs, learning_rate, loss_weights, model_save in cfg.Train.TRAINING_PLAN:
+        end_epoch += epochs
+        train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_save)
 
 
-def train_by_plan(plan):
-    dataset_name, epochs, learning_rate, loss_weights, model_save = plan
+def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_save):
     batch_size, train_mode = cfg.Train.BATCH_SIZE, cfg.Train.MODE
     tfrd_path, ckpt_path = cfg.Paths.TFRECORD, op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
     initial_epoch = read_previous_epoch(ckpt_path)
+    if end_epoch <= initial_epoch:
+        print(f"!! end_epoch {end_epoch} <= initial_epoch {initial_epoch}, no need to train")
+        return
 
     dataset_train, train_steps, imshape, anchors_per_scale = \
         get_dataset(tfrd_path, dataset_name, False, batch_size, "train")
@@ -108,4 +111,5 @@ def read_previous_epoch(ckpt_path):
 
 
 if __name__ == "__main__":
+    np.set_printoptions(precision=4, suppress=True, linewidth=100)
     train_main()

@@ -40,7 +40,7 @@ class TfrecordMaker:
     def __init__(self, dataset_cfg, split, tfrpath, shard_size,
                  drive_example_limit=0,
                  total_example_limit=0,
-                 anchors_pixel=cfg.Tfrdata.ANCHORS_PIXEL):
+                 anchors_ratio=cfg.Tfrdata.ANCHORS_RATIO):
         self.dataset_cfg = dataset_cfg
         self.split = split                  # split name e.g. "train", "val", "test
         self.tfrpath__ = tfrpath + "__"     # temporary path to write tfrecord
@@ -64,7 +64,7 @@ class TfrecordMaker:
         # anchors per scale
         anchors = dict()
         for i, feat_name in enumerate(cfg.Model.Output.FEATURE_ORDER):
-            anchors[feat_name.replace("feature", "anchor")] = anchors_pixel[i * 3:i * 3 + 3].tolist()
+            anchors[feat_name.replace("feature", "anchor")] = anchors_ratio[i * 3:i * 3 + 3].tolist()
         self.anchors_per_scale = anchors
 
     def make(self):

@@ -69,17 +69,14 @@ class FPN(HeadBase):
 
 
 class FeatureDecoder:
-    def __init__(self, output_compos, anchors_per_scale, imshape):
+    def __init__(self, output_compos, anchors_per_scale):
         """
         :param output_compos: Config.Model.Output.OUT_COMPOSITION
-        :param anchors_per_scale: anchor box sizes in pixel per scale,
+        :param anchors_per_scale: anchor box sizes in ratio per scale,
                                   e.g. {"anchor_s": [[8.0, 6.2], [18.5, 9.8], [14.2, 20.3]], ...}
-        :param imshape: input image shape
         """
         self.output_compos = output_compos
-        # rescale anchors in pixels to ratio to image
-        anchors_ratio = {key: np.array(anchors) / np.array([imshape[:2]]) for key, anchors in anchors_per_scale.items()}
-        self.anchors_per_scale = anchors_ratio
+        self.anchors_per_scale = anchors_per_scale
 
     def __call__(self, feature, scale_name: str):
         """

@@ -10,13 +10,13 @@ class ExampleMaker:
     def __init__(self, data_reader, dataset_cfg,
                  feat_scales=cfg.Model.Output.FEATURE_SCALES,
                  feat_order=cfg.Model.Output.FEATURE_ORDER,
-                 anchors_pixel=cfg.Tfrdata.ANCHORS_PIXEL,
+                 anchors_ratio=cfg.Tfrdata.ANCHORS_RATIO,
                  category_names=cfg.Tfrdata.CATEGORY_NAMES,
                  max_bbox=cfg.Tfrdata.MAX_BBOX_PER_IMAGE):
         self.data_reader = data_reader
         self.feat_scales = feat_scales
         self.feat_order = feat_order
-        self.anchors_pixel = anchors_pixel
+        self.anchors_ratio = anchors_ratio
         self.preprocess_example = pr.ExamplePreprocess(target_hw=dataset_cfg.INPUT_RESOLUTION,
                                                        dataset_cfg=dataset_cfg,
                                                        category_names=category_names,
@@ -35,11 +35,10 @@ class ExampleMaker:
     def assign_bbox_over_feature_map(self, example):
         # anchors_ratio: anchor sizes normalized by tfrecord image size (0~1)
         tfr_hw_shape = example["image"].shape[:2]
-        anchors_ratio = self.anchors_pixel / np.array([tfr_hw_shape])
         # feature map sizes are derived from tfrecord image shape
         # feat_sizes: {"feature_l": tfr_hw_shape / 32, ...}
         feat_sizes = {key: np.array(tfr_hw_shape) // scale for key, scale in self.feat_scales.items()}
-        gt_features = self.make_gt_feature_map(example["bboxes"], anchors_ratio, feat_sizes, self.feat_order)
+        gt_features = self.make_gt_feature_map(example["bboxes"], self.anchors_ratio, feat_sizes, self.feat_order)
         example.update(gt_features)
         return example
 

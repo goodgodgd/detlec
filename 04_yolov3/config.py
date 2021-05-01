@@ -9,13 +9,6 @@ class Config:
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
         CHECK_POINT = op.join(RESULT_ROOT, "ckpt")
 
-    class Tfrdata:
-        DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
-        MAX_BBOX_PER_IMAGE = 20
-        CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
-        SHARD_SIZE = 2000
-        ANCHORS_PIXEL = None  # assigned by set_anchors()
-
     class Datasets:
         # specific dataset configs MUST have the same items
         class Kitti:
@@ -33,6 +26,26 @@ class Config:
         def get_dataset_config(cls, dataset):
             return cls.DATASET_CONFIGS[dataset]
 
+    class Tfrdata:
+        DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
+        MAX_BBOX_PER_IMAGE = 20
+        CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
+        SHARD_SIZE = 2000
+        ANCHORS_RATIO = None  # assigned by set_anchors()
+
+        @classmethod
+        def set_anchors(cls):
+            basic_anchor = params.Anchor.COCO_YOLOv3
+            target_dataset = Config.Datasets.TARGET_DATASET
+            dataset_cfg = Config.Datasets.get_dataset_config(target_dataset)
+            input_resolution = np.array(dataset_cfg.INPUT_RESOLUTION, dtype=np.float32)
+            anchor_resolution = np.array(params.Anchor.COCO_RESOLUTION, dtype=np.float32)
+            scale = np.min(input_resolution / anchor_resolution)
+            anchors_pixel = np.around(basic_anchor * scale, 1)
+            print("[set_anchors] anchors in pixel:\n", anchors_pixel)
+            Config.Tfrdata.ANCHORS_RATIO = np.around(basic_anchor * scale / input_resolution, 4)
+            print("[set_anchors] anchors in ratio:\n", Config.Tfrdata.ANCHORS_RATIO)
+
     class Model:
         class Output:
             FEATURE_SCALES = {"feature_s": 8, "feature_m": 16, "feature_l": 32}
@@ -40,6 +53,12 @@ class Config:
             NUM_ANCHORS_PER_SCALE = 3
             OUT_CHANNELS = 0                    # assigned by set_out_channel()
             OUT_COMPOSITION = ()                # assigned by set_out_channel()
+
+            @classmethod
+            def set_out_channel(cls):
+                num_cats = len(Config.Tfrdata.CATEGORY_NAMES)
+                Config.Model.Output.OUT_COMPOSITION = [('yxhw', 4), ('object', 1), ('cat_pr', num_cats)]
+                Config.Model.Output.OUT_CHANNELS = sum([val for key, val in Config.Model.Output.OUT_COMPOSITION])
 
         class Structure:
             BACKBONE = "Darknet53"
@@ -53,8 +72,8 @@ class Config:
         BATCH_SIZE = 2
         TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
 
-    @staticmethod
-    def config_summary():
+    @classmethod
+    def summary(cls):
         # return dict of important parameters
         pass
 
@@ -79,20 +98,5 @@ class Config:
             assert 0, f"Invalid code: {code}"
 
 
-def set_anchors():
-    basic_anchor = params.AnchorRatio.COCO
-    target_dataset = Config.Datasets.TARGET_DATASET
-    dataset_cfg = Config.Datasets.get_dataset_config(target_dataset)
-    scale = min(dataset_cfg.INPUT_RESOLUTION)
-    Config.Tfrdata.ANCHORS_PIXEL = np.around(basic_anchor * scale, 1)
-    print("[set_anchors] anchors:", Config.Tfrdata.ANCHORS_PIXEL)
-
-
-def set_out_channel():
-    num_cats = len(Config.Tfrdata.CATEGORY_NAMES)
-    Config.Model.Output.OUT_COMPOSITION = [('yxhw', 4), ('object', 1), ('cat_pr', num_cats)]
-    Config.Model.Output.OUT_CHANNELS = sum([val for key, val in Config.Model.Output.OUT_COMPOSITION])
-
-
-set_anchors()
-set_out_channel()
+Config.Tfrdata.set_anchors()
+Config.Model.Output.set_out_channel()

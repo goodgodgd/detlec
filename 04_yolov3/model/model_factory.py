@@ -38,7 +38,7 @@ class ModelFactory:
         backbone_features = backbone_model(input_tensor)
         head_features = head_model(backbone_features)
         output_features = dict()
-        decode_features = head.FeatureDecoder(self.output_compos, self.anchors_per_scale, self.input_shape)
+        decode_features = head.FeatureDecoder(self.output_compos, self.anchors_per_scale)
         for i, (scale, feature) in enumerate(head_features.items()):
             output_features[scale] = decode_features(feature, scale)
         yolo_model = tf.keras.Model(inputs=input_tensor, outputs=output_features, name="yolo_model")
