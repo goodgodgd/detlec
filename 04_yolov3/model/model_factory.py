@@ -46,7 +46,6 @@ class ModelFactory:
 
 
 # ==================================================
-from config import Config as cfg
 
 
 def test_model_factory():

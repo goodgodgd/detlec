@@ -25,9 +25,9 @@ def train_main():
 def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_save):
     batch_size, train_mode = cfg.Train.BATCH_SIZE, cfg.Train.MODE
     tfrd_path, ckpt_path = cfg.Paths.TFRECORD, op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
-    initial_epoch = read_previous_epoch(ckpt_path)
-    if end_epoch <= initial_epoch:
-        print(f"!! end_epoch {end_epoch} <= initial_epoch {initial_epoch}, no need to train")
+    start_epoch = read_previous_epoch(ckpt_path)
+    if end_epoch <= start_epoch:
+        print(f"!! end_epoch {end_epoch} <= start_epoch {start_epoch}, no need to train")
         return
 
     dataset_train, train_steps, imshape, anchors_per_scale = \
@@ -36,13 +36,12 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
 
     model, loss, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
                                                    learning_rate, loss_weights, dataset_name)
-
+    print("train:", train_steps, imshape, anchors_per_scale)
     trainer = tv.trainer_factory(train_mode, model, loss, optimizer, train_steps)
     validater = tv.validater_factory(train_mode, model, loss, val_steps)
     logger = Logger()
-    end_epoch = initial_epoch + epochs
 
-    for epoch in range(initial_epoch, end_epoch):
+    for epoch in range(start_epoch, end_epoch):
         print(f"========== Start dataset : {dataset_name} epoch: {epoch + 1}/{end_epoch} ==========")
         train_result = trainer.run_epoch(dataset_train)
         val_result = validater.run_epoch(dataset_val)
@@ -79,6 +78,7 @@ def save_model_ckpt(ckpt_path, model, weights_suffix='latest'):
     ckpt_file = op.join(ckpt_path, f"yolo_{weights_suffix}.h5")
     if not op.isdir(ckpt_path):
         os.makedirs(ckpt_path, exist_ok=True)
+    print("=== save model:", ckpt_file)
     model.save_weights(ckpt_file)
 
 

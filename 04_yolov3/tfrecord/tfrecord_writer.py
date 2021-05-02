@@ -73,7 +73,7 @@ class TfrecordMaker:
         with uc.PathManager(self.tfrpath__, closer_func=self.on_exit) as path_manager:
             self.path_manager = path_manager
             for self.drive_index, drive_path in enumerate(drive_paths):
-                print(f"\n==== Start drive-{self.drive_index}:", drive_path)
+                print(f"\n===== Start drive {self.drive_index}:", drive_path)
                 # skip if drive_path has been completed
                 if self.init_drive_tfrecord():
                     continue
@@ -106,7 +106,7 @@ class TfrecordMaker:
     def open_new_writer(self, shard_index):
         drive_name = op.basename(self.tfr_drive_path)
         outfile = f"{self.tfr_drive_path}/{drive_name}_shard_{shard_index:03d}.tfrecord"
-        print(f"\n==== Start shard-{shard_index}:", outfile)
+        print(f"\n=== Start shard {shard_index}:", outfile)
         self.writer = tf.io.TFRecordWriter(outfile)
 
     def write_drive(self, drive_path):

@@ -39,6 +39,7 @@ class TrainValBase:
             if step > 20:
                 break
 
+        print("")
         self.model_log.append_epoch_result(time=time.time() - epoch_start)
         return self.model_log
 

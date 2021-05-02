@@ -14,9 +14,9 @@ def head_factory(head, conv_args, num_anchors_per_scale, out_channels):
 
 class HeadBase:
     def __init__(self, conv_args, num_anchors_per_scale, out_channels):
-        self.conv2d = mu.CustomConv2D(kernel_size=3, strides=1, scope="head", **conv_args)
-        self.conv2d_k1 = mu.CustomConv2D(kernel_size=1, strides=1, scope="head", **conv_args)
-        self.conv2d_s2 = mu.CustomConv2D(kernel_size=3, strides=2, scope="head", **conv_args)
+        self.conv2d = mu.CustomConv2D(kernel_size=3, strides=1, **conv_args)
+        self.conv2d_k1 = mu.CustomConv2D(kernel_size=1, strides=1, **conv_args)
+        self.conv2d_s2 = mu.CustomConv2D(kernel_size=3, strides=2, **conv_args)
         self.conv2d_output = mu.CustomConv2D(kernel_size=1, strides=1, scope="output", bn=False)
         self.num_anchors_per_scale = num_anchors_per_scale
         self.out_channels = out_channels
@@ -122,16 +122,16 @@ class FeatureDecoder:
         yx_dec = (yx_box + grid) / divider
         return yx_dec
 
-    def decode_hw(self, yxhw_raw, anchors_np):
+    def decode_hw(self, yxhw_raw, anchors):
         """
         :param yxhw_raw: (batch, grid_h, grid_w, anchor, 4)
-        :param anchors_np: [height, width]s of anchors in ratio to image (0~1), (anchor, 2)
+        :param anchors: [height, width]s of anchors in ratio to image (0~1), (anchor, 2)
         :return: hw_dec = heights and widths of boxes in ratio to image (batch, grid_h, grid_w, anchor, 2)
         """
         hw_raw = yxhw_raw[..., 2:]
+        anchors_np = np.array(anchors, np.float32)
         num_anc, channel = anchors_np.shape     # (3, 2)
         anchors_tf = tf.reshape(anchors_np, (1, 1, 1, num_anc, channel))
-        anchors_tf = tf.cast(anchors_tf, tf.float32)
         hw_dec = tf.exp(hw_raw) * anchors_tf
         return hw_dec
 

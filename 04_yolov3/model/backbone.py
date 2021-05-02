@@ -11,9 +11,9 @@ def backbone_factory(backbone, conv_kwargs):
 
 class BackboneBase:
     def __init__(self, conv_kwargs):
-        self.conv2d = mu.CustomConv2D(kernel_size=3, strides=1, scope="back", **conv_kwargs)
-        self.conv2d_k1 = mu.CustomConv2D(kernel_size=1, strides=1, scope="back", **conv_kwargs)
-        self.conv2d_s2 = mu.CustomConv2D(kernel_size=3, strides=2, scope="back", **conv_kwargs)
+        self.conv2d = mu.CustomConv2D(kernel_size=3, strides=1, **conv_kwargs)
+        self.conv2d_k1 = mu.CustomConv2D(kernel_size=1, strides=1, **conv_kwargs)
+        self.conv2d_s2 = mu.CustomConv2D(kernel_size=3, strides=2, **conv_kwargs)
 
     def residual(self, x, filters):
         short_cut = x

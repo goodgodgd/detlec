@@ -20,7 +20,6 @@ class CustomConv2D:
         index = CustomConv2D.CALL_COUNT
         name = f"conv{index:03d}" if name is None else f"{name}/{index:03d}"
         name = f"{self.scope}/{name}" if self.scope else name
-        print("conv name", name)
 
         x = layers.Conv2D(filters, self.kernel_size, self.strides, self.padding,
                           use_bias=not self.bn, kernel_regularizer=tf.keras.regularizers.l2(0.0005),
