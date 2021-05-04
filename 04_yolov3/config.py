@@ -31,7 +31,7 @@ class Config:
         MAX_BBOX_PER_IMAGE = 20
         CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
         SHARD_SIZE = 2000
-        ANCHORS_RATIO = None  # assigned by set_anchors()
+        ANCHORS_PIXEL = None  # assigned by set_anchors()
 
         @classmethod
         def set_anchors(cls):
@@ -41,10 +41,8 @@ class Config:
             input_resolution = np.array(dataset_cfg.INPUT_RESOLUTION, dtype=np.float32)
             anchor_resolution = np.array(params.Anchor.COCO_RESOLUTION, dtype=np.float32)
             scale = np.min(input_resolution / anchor_resolution)
-            anchors_pixel = np.around(basic_anchor * scale, 1)
-            print("[set_anchors] anchors in pixel:\n", anchors_pixel)
-            Config.Tfrdata.ANCHORS_RATIO = np.around(basic_anchor * scale / input_resolution, 4)
-            print("[set_anchors] anchors in ratio:\n", Config.Tfrdata.ANCHORS_RATIO)
+            Config.Tfrdata.ANCHORS_PIXEL = np.around(basic_anchor * scale, 1)
+            print("[set_anchors] anchors in pixel:\n", Config.Tfrdata.ANCHORS_PIXEL)
 
     class Model:
         class Output:

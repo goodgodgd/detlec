@@ -10,13 +10,13 @@ class ExampleMaker:
     def __init__(self, data_reader, dataset_cfg,
                  feat_scales=cfg.Model.Output.FEATURE_SCALES,
                  feat_order=cfg.Model.Output.FEATURE_ORDER,
-                 anchors_ratio=cfg.Tfrdata.ANCHORS_RATIO,
+                 anchors_pixel=cfg.Tfrdata.ANCHORS_PIXEL,
                  category_names=cfg.Tfrdata.CATEGORY_NAMES,
                  max_bbox=cfg.Tfrdata.MAX_BBOX_PER_IMAGE):
         self.data_reader = data_reader
         self.feat_scales = feat_scales
         self.feat_order = feat_order
-        self.anchors_ratio = anchors_ratio
+        self.anchors_ratio = anchors_pixel / np.array([dataset_cfg.INPUT_RESOLUTION])
         self.preprocess_example = pr.ExamplePreprocess(target_hw=dataset_cfg.INPUT_RESOLUTION,
                                                        dataset_cfg=dataset_cfg,
                                                        category_names=category_names,

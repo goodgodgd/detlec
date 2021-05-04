@@ -23,12 +23,12 @@ def drive_manager_factory(dataset_name, split, srcpath):
         assert 0, f"[drive_manager_factory] invalid dataset name: {dataset_name}"
 
 
-def drive_reader_factory(dataset_cfg, split, drive_path):
-    if dataset_cfg.NAME == "kitti":
+def drive_reader_factory(dataset_name, categories, split, drive_path):
+    if dataset_name == "kitti":
         from tfrecord.readers.kitti_reader import KittiReader
-        return KittiReader(drive_path, split, dataset_cfg)
+        return KittiReader(drive_path, split, categories)
     else:
-        assert 0, f"[drive_reader_factory] invalid dataset name: {dataset_cfg.NAME}"
+        assert 0, f"[drive_reader_factory] invalid dataset name: {dataset_name}"
 
 
 class TfrecordMaker:
@@ -40,7 +40,7 @@ class TfrecordMaker:
     def __init__(self, dataset_cfg, split, tfrpath, shard_size,
                  drive_example_limit=0,
                  total_example_limit=0,
-                 anchors_ratio=cfg.Tfrdata.ANCHORS_RATIO):
+                 anchors_pixel=cfg.Tfrdata.ANCHORS_PIXEL):
         self.dataset_cfg = dataset_cfg
         self.split = split                  # split name e.g. "train", "val", "test
         self.tfrpath__ = tfrpath + "__"     # temporary path to write tfrecord
@@ -61,11 +61,16 @@ class TfrecordMaker:
         self.serializer = tu.TfrSerializer()
         self.writer = None
         self.path_manager = uc.PathManager([""])
-        # anchors per scale
+        self.anchors_per_scale = self.split_anchors(anchors_pixel)
+
+    def split_anchors(self, anchors_pixel):
         anchors = dict()
         for i, feat_name in enumerate(cfg.Model.Output.FEATURE_ORDER):
-            anchors[feat_name.replace("feature", "anchor")] = anchors_ratio[i * 3:i * 3 + 3].tolist()
-        self.anchors_per_scale = anchors
+            # tolist() results in small errors e.g. 1.1 -> 1.099999999
+            scale_anchors = anchors_pixel[i * 3:i * 3 + 3].tolist()
+            scale_anchors = [[round(anc[0], 1), round(anc[1], 1)] for anc in scale_anchors]
+            anchors[feat_name.replace("feature", "anchor")] = scale_anchors
+        return anchors
 
     def make(self):
         print("\n\n========== Start dataset:", self.dataset_cfg.NAME)
@@ -110,7 +115,7 @@ class TfrecordMaker:
         self.writer = tf.io.TFRecordWriter(outfile)
 
     def write_drive(self, drive_path):
-        data_reader = drive_reader_factory(self.dataset_cfg, self.split, drive_path)
+        data_reader = drive_reader_factory(self.dataset_cfg.NAME, self.dataset_cfg.CATEGORIES_TO_USE, self.split, drive_path)
         example_maker = ExampleMaker(data_reader, self.dataset_cfg)
         num_drive_frames = data_reader.num_frames()
         drive_example = {}

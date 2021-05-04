@@ -72,8 +72,7 @@ class FeatureDecoder:
     def __init__(self, output_compos, anchors_per_scale):
         """
         :param output_compos: Config.Model.Output.OUT_COMPOSITION
-        :param anchors_per_scale: anchor box sizes in ratio per scale,
-                                  e.g. {"anchor_s": [[8.0, 6.2], [18.5, 9.8], [14.2, 20.3]], ...}
+        :param anchors_per_scale: anchor box sizes in ratio per scale
         """
         self.output_compos = output_compos
         self.anchors_per_scale = anchors_per_scale
@@ -85,10 +84,10 @@ class FeatureDecoder:
         :return: decoded feature in the same shape e.g. (yxhw, objectness, category probabilities)
         """
         slices = mu.slice_features(feature, self.output_compos)
-        anchors = self.anchors_per_scale[scale_name.replace("feature", "anchor")]
+        anchors_ratio = self.anchors_per_scale[scale_name.replace("feature", "anchor")]
 
         box_yx = self.decode_yx(slices["yxhw"])
-        box_hw = self.decode_hw(slices["yxhw"], anchors)
+        box_hw = self.decode_hw(slices["yxhw"], anchors_ratio)
         objectness = tf.sigmoid(slices["object"])
         cat_probs = tf.sigmoid(slices["cat_pr"])
 
@@ -122,16 +121,15 @@ class FeatureDecoder:
         yx_dec = (yx_box + grid) / divider
         return yx_dec
 
-    def decode_hw(self, yxhw_raw, anchors):
+    def decode_hw(self, yxhw_raw, anchors_ratio):
         """
         :param yxhw_raw: (batch, grid_h, grid_w, anchor, 4)
-        :param anchors: [height, width]s of anchors in ratio to image (0~1), (anchor, 2)
+        :param anchors_ratio: [height, width]s of anchors in ratio to image (0~1), (anchor, 2)
         :return: hw_dec = heights and widths of boxes in ratio to image (batch, grid_h, grid_w, anchor, 2)
         """
         hw_raw = yxhw_raw[..., 2:]
-        anchors_np = np.array(anchors, np.float32)
-        num_anc, channel = anchors_np.shape     # (3, 2)
-        anchors_tf = tf.reshape(anchors_np, (1, 1, 1, num_anc, channel))
+        num_anc, channel = anchors_ratio.shape     # (3, 2)
+        anchors_tf = tf.reshape(anchors_ratio, (1, 1, 1, num_anc, channel))
         hw_dec = tf.exp(hw_raw) * anchors_tf
         return hw_dec
 

@@ -36,7 +36,6 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
 
     model, loss, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
                                                    learning_rate, loss_weights, dataset_name)
-    print("train:", train_steps, imshape, anchors_per_scale)
     trainer = tv.trainer_factory(train_mode, model, loss, optimizer, train_steps)
     validater = tv.validater_factory(train_mode, model, loss, val_steps)
     logger = Logger()
@@ -60,8 +59,10 @@ def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
     tfr_cfg = reader.get_tfr_config()
     image_shape = tfr_cfg["image"]["shape"]
     # anchor sizes per scale in pixel
-    anchors_per_scale = {key: val for key, val in tfr_cfg.items() if key.startswith("anchor")}
-    print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, frames={frames}")
+    anchors_per_scale = {key: np.array(val) / np.array([image_shape[:2]]) for key, val in tfr_cfg.items() if key.startswith("anchor")}
+    anchors_per_scale = {key: val.astype(np.float32) for key, val in anchors_per_scale.items()}
+    print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, "
+          f"frames={frames},\n\tanchors={anchors_per_scale}")
     return dataset, frames // batch_size, image_shape, anchors_per_scale
 
 
