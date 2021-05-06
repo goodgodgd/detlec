@@ -12,6 +12,7 @@ import utils.util_class as uc
 import utils.util_function as uf
 from tfrecord.example_maker import ExampleMaker
 import tfrecord.tfr_util as tu
+from config import Config as cfg
 
 
 def drive_manager_factory(dataset_name, split, srcpath):
@@ -22,12 +23,12 @@ def drive_manager_factory(dataset_name, split, srcpath):
         assert 0, f"[drive_manager_factory] invalid dataset name: {dataset_name}"
 
 
-def drive_reader_factory(dataset_cfg, split, drive_path):
-    if dataset_cfg.NAME == "kitti":
+def drive_reader_factory(dataset_name, categories, split, drive_path):
+    if dataset_name == "kitti":
         from tfrecord.readers.kitti_reader import KittiReader
-        return KittiReader(drive_path, split, dataset_cfg)
+        return KittiReader(drive_path, split, categories)
     else:
-        assert 0, f"[drive_reader_factory] invalid dataset name: {dataset_cfg.NAME}"
+        assert 0, f"[drive_reader_factory] invalid dataset name: {dataset_name}"
 
 
 class TfrecordMaker:
@@ -37,7 +38,9 @@ class TfrecordMaker:
     serialize examples and write serialized data into tfrecord files
     """
     def __init__(self, dataset_cfg, split, tfrpath, shard_size,
-                 drive_example_limit=0, total_example_limit=0):
+                 drive_example_limit=0,
+                 total_example_limit=0,
+                 anchors_pixel=cfg.Tfrdata.ANCHORS_PIXEL):
         self.dataset_cfg = dataset_cfg
         self.split = split                  # split name e.g. "train", "val", "test
         self.tfrpath__ = tfrpath + "__"     # temporary path to write tfrecord
@@ -58,6 +61,16 @@ class TfrecordMaker:
         self.serializer = tu.TfrSerializer()
         self.writer = None
         self.path_manager = uc.PathManager([""])
+        self.anchors_per_scale = self.split_anchors(anchors_pixel)
+
+    def split_anchors(self, anchors_pixel):
+        anchors = dict()
+        for i, feat_name in enumerate(cfg.Model.Output.FEATURE_ORDER):
+            # tolist() results in small errors e.g. 1.1 -> 1.099999999
+            scale_anchors = anchors_pixel[i * 3:i * 3 + 3].tolist()
+            scale_anchors = [[round(anc[0], 1), round(anc[1], 1)] for anc in scale_anchors]
+            anchors[feat_name.replace("feature", "anchor")] = scale_anchors
+        return anchors
 
     def make(self):
         print("\n\n========== Start dataset:", self.dataset_cfg.NAME)
@@ -65,7 +78,7 @@ class TfrecordMaker:
         with uc.PathManager(self.tfrpath__, closer_func=self.on_exit) as path_manager:
             self.path_manager = path_manager
             for self.drive_index, drive_path in enumerate(drive_paths):
-                print(f"\n==== Start drive-{self.drive_index}:", drive_path)
+                print(f"\n===== Start drive {self.drive_index}:", drive_path)
                 # skip if drive_path has been completed
                 if self.init_drive_tfrecord():
                     continue
@@ -98,11 +111,11 @@ class TfrecordMaker:
     def open_new_writer(self, shard_index):
         drive_name = op.basename(self.tfr_drive_path)
         outfile = f"{self.tfr_drive_path}/{drive_name}_shard_{shard_index:03d}.tfrecord"
-        print(f"\n==== Start shard-{shard_index}:", outfile)
+        print(f"\n=== Start shard {shard_index}:", outfile)
         self.writer = tf.io.TFRecordWriter(outfile)
 
     def write_drive(self, drive_path):
-        data_reader = drive_reader_factory(self.dataset_cfg, self.split, drive_path)
+        data_reader = drive_reader_factory(self.dataset_cfg.NAME, self.dataset_cfg.CATEGORIES_TO_USE, self.split, drive_path)
         example_maker = ExampleMaker(data_reader, self.dataset_cfg)
         num_drive_frames = data_reader.num_frames()
         drive_example = {}
@@ -172,6 +185,7 @@ class TfrecordMaker:
     def write_tfrecord_config(self, example):
         assert ('image' in example) and (example['image'] is not None)
         config = tu.inspect_properties(example)
+        config.update(self.anchors_per_scale)
         config["length"] = self.drive_example_count
         print("## save config", config)
         with open(op.join(self.tfr_drive_path, "tfr_config.txt"), "w") as fr:

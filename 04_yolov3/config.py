@@ -1,17 +1,13 @@
 import os.path as op
+import parameter_pool as params
 import numpy as np
 
 
 class Config:
     class Paths:
-        RESULT_ROOT = "/home/ian/workspace/detlec/dataset"
+        RESULT_ROOT = "/home/ian/workspace/detlec/result"
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
-
-    class Tfrdata:
-        DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
-        MAX_BBOX_PER_IMAGE = 20
-        CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
-        SHARD_SIZE = 2000
+        CHECK_POINT = op.join(RESULT_ROOT, "ckpt")
 
     class Datasets:
         # specific dataset configs MUST have the same items
@@ -24,20 +20,60 @@ class Config:
             CROP_TLBR = [0, 0, 0, 0]        # crop [top, left, bottom, right] or [y1 x1 y2 x2]
 
         DATASET_CONFIGS = {"kitti": Kitti}
+        TARGET_DATASET = "kitti"
 
         @classmethod
         def get_dataset_config(cls, dataset):
             return cls.DATASET_CONFIGS[dataset]
 
+    class Tfrdata:
+        DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
+        MAX_BBOX_PER_IMAGE = 20
+        CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
+        SHARD_SIZE = 2000
+        ANCHORS_PIXEL = None  # assigned by set_anchors()
+
+        @classmethod
+        def set_anchors(cls):
+            basic_anchor = params.Anchor.COCO_YOLOv3
+            target_dataset = Config.Datasets.TARGET_DATASET
+            dataset_cfg = Config.Datasets.get_dataset_config(target_dataset)
+            input_resolution = np.array(dataset_cfg.INPUT_RESOLUTION, dtype=np.float32)
+            anchor_resolution = np.array(params.Anchor.COCO_RESOLUTION, dtype=np.float32)
+            scale = np.min(input_resolution / anchor_resolution)
+            Config.Tfrdata.ANCHORS_PIXEL = np.around(basic_anchor * scale, 1)
+            print("[set_anchors] anchors in pixel:\n", Config.Tfrdata.ANCHORS_PIXEL)
+
     class Model:
-        FEATURE_SCALES = {"feature_l": 32, "feature_m": 16, "feature_s": 8}
-        FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
-        ANCHORS_PIXEL = np.array([[13, 10], [30, 16], [23, 33],
-                                  [61, 30], [45, 62], [119, 59],
-                                  [90, 116], [198, 156], [326, 373]])
+        class Output:
+            FEATURE_SCALES = {"feature_s": 8, "feature_m": 16, "feature_l": 32}
+            FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
+            NUM_ANCHORS_PER_SCALE = 3
+            OUT_CHANNELS = 0                    # assigned by set_out_channel()
+            OUT_COMPOSITION = ()                # assigned by set_out_channel()
+
+            @classmethod
+            def set_out_channel(cls):
+                num_cats = len(Config.Tfrdata.CATEGORY_NAMES)
+                Config.Model.Output.OUT_COMPOSITION = [('yxhw', 4), ('object', 1), ('cat_pr', num_cats)]
+                Config.Model.Output.OUT_CHANNELS = sum([val for key, val in Config.Model.Output.OUT_COMPOSITION])
+
+        class Structure:
+            BACKBONE = "Darknet53"
+            HEAD = "FPN"
+            BACKBONE_CONV_ARGS = {"activation": "leaky_relu", "scope": "back"}
+            HEAD_CONV_ARGS = {"activation": "leaky_relu", "scope": "head"}
 
     class Train:
+        CKPT_NAME = "yolo"
+        MODE = ["eager", "graph"][0]
         BATCH_SIZE = 2
+        TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
+
+    @classmethod
+    def summary(cls):
+        # return dict of important parameters
+        pass
 
     @classmethod
     def get_img_shape(cls, code="HW", dataset="kitti", scale_div=1):
@@ -60,3 +96,5 @@ class Config:
             assert 0, f"Invalid code: {code}"
 
 
+Config.Tfrdata.set_anchors()
+Config.Model.Output.set_out_channel()

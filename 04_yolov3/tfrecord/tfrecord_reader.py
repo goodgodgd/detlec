@@ -70,8 +70,8 @@ class TfrecordReader:
         dataset = dataset.batch(batch_size=self.batch_size, drop_remainder=True)
         return dataset
 
-    def get_total_steps(self):
-        return self.config["length"] // self.batch_size
+    def get_total_frames(self):
+        return self.config["length"]
 
     def get_tfr_config(self):
         return self.config
@@ -95,7 +95,7 @@ def test_read_dataset():
         cv2.imshow("image with boxes", image)
 
         features = []
-        for feat_name in cfg.Model.FEATURE_ORDER:
+        for feat_name in cfg.Model.Output.FEATURE_ORDER:
             feature = x[feat_name][0].numpy()
             feature = feature[feature[..., 4] > 0]
             features.append(feature)

@@ -7,37 +7,38 @@ from config import Config as cfg
 
 
 class ExampleMaker:
-    def __init__(self, data_reader, dataset_cfg):
+    def __init__(self, data_reader, dataset_cfg,
+                 feat_scales=cfg.Model.Output.FEATURE_SCALES,
+                 feat_order=cfg.Model.Output.FEATURE_ORDER,
+                 anchors_pixel=cfg.Tfrdata.ANCHORS_PIXEL,
+                 category_names=cfg.Tfrdata.CATEGORY_NAMES,
+                 max_bbox=cfg.Tfrdata.MAX_BBOX_PER_IMAGE):
         self.data_reader = data_reader
-        self.feat_scales = cfg.Model.FEATURE_SCALES
-        self.feat_order = cfg.Model.FEATURE_ORDER
-        self.anchors_pixel = cfg.Model.ANCHORS_PIXEL
+        self.feat_scales = feat_scales
+        self.feat_order = feat_order
+        self.anchors_ratio = anchors_pixel / np.array([dataset_cfg.INPUT_RESOLUTION])
         self.preprocess_example = pr.ExamplePreprocess(target_hw=dataset_cfg.INPUT_RESOLUTION,
                                                        dataset_cfg=dataset_cfg,
-                                                       category_names=cfg.Tfrdata.CATEGORY_NAMES,
-                                                       max_bbox=cfg.Tfrdata.MAX_BBOX_PER_IMAGE,
-                                                       )
+                                                       category_names=category_names,
+                                                       max_bbox=max_bbox)
 
     def get_example(self, index):
         example = dict()
         example["image"] = self.data_reader.get_image(index)
-        raw_hw_shape = example["image"].shape[:2]
         example["bboxes"] = self.data_reader.get_bboxes(index)
         example = self.preprocess_example(example)
-        example = self.assign_bbox_over_feature_map(example, raw_hw_shape)
+        example = self.assign_bbox_over_feature_map(example)
         if index % 100 == 10:
             self.show_example(example)
         return example
 
-    def assign_bbox_over_feature_map(self, example, raw_hw_shape):
-        # anchors are derived from raw image shape
-        # anchors_ratio: anchor sizes normalized by image size (0~1)
-        anchors_ratio = self.anchors_pixel / np.array([raw_hw_shape])
+    def assign_bbox_over_feature_map(self, example):
+        # anchors_ratio: anchor sizes normalized by tfrecord image size (0~1)
+        tfr_hw_shape = example["image"].shape[:2]
         # feature map sizes are derived from tfrecord image shape
         # feat_sizes: {"feature_l": tfr_hw_shape / 32, ...}
-        tfr_hw_shape = example["image"].shape[:2]
         feat_sizes = {key: np.array(tfr_hw_shape) // scale for key, scale in self.feat_scales.items()}
-        gt_features = self.make_gt_feature_map(example["bboxes"], anchors_ratio, feat_sizes, self.feat_order)
+        gt_features = self.make_gt_feature_map(example["bboxes"], self.anchors_ratio, feat_sizes, self.feat_order)
         example.update(gt_features)
         return example
 
@@ -80,7 +81,7 @@ class ExampleMaker:
         cv2.imshow("image with bboxes", image)
 
         features = []
-        for feat_name in cfg.Model.FEATURE_ORDER:
+        for feat_name in cfg.Model.Output.FEATURE_ORDER:
             feature = example[feat_name]
             feature = feature[feature[..., 4] > 0]      # objectness == 1
             features.append(feature)
