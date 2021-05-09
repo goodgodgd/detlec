@@ -7,7 +7,7 @@ import pandas as pd
 from config import Config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
 from model.model_factory import ModelFactory
-from train.loss_factory import LossFactory
+from train.loss_integration import IntegratedLoss
 from train.logger import Logger
 import train.train_val as tv
 import utils.util_function as uf
@@ -25,6 +25,7 @@ def train_main():
 def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_save):
     batch_size, train_mode = cfg.Train.BATCH_SIZE, cfg.Train.MODE
     tfrd_path, ckpt_path = cfg.Paths.TFRECORD, op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
+    valid_category = cfg.get_valid_category_mask(dataset_name)
     start_epoch = read_previous_epoch(ckpt_path)
     if end_epoch <= start_epoch:
         print(f"!! end_epoch {end_epoch} <= start_epoch {start_epoch}, no need to train")
@@ -35,7 +36,7 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
     dataset_val, val_steps, _, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
 
     model, loss, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
-                                                   learning_rate, loss_weights, dataset_name)
+                                                   learning_rate, loss_weights, valid_category)
     trainer = tv.trainer_factory(train_mode, model, loss, optimizer, train_steps)
     validater = tv.validater_factory(train_mode, model, loss, val_steps)
     logger = Logger()
@@ -67,10 +68,10 @@ def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
 
 
 def create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path, learning_rate,
-                          loss_weights, dataset_name, weight_suffix='latest'):
+                          loss_weights, valid_category, weight_suffix='latest'):
     model = ModelFactory(batch_size, imshape, anchors_per_scale).get_model()
     model = try_load_weights(ckpt_path, model, weight_suffix)
-    loss_object = LossFactory(loss_weights, dataset_name).get_loss()
+    loss_object = IntegratedLoss(loss_weights, valid_category)
     optimizer = tf.optimizers.Adam(lr=learning_rate)
     return model, loss_object, optimizer
 

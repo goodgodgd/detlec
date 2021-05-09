@@ -35,12 +35,3 @@ class CustomConv2D:
         if self.bn:
             x = layers.BatchNormalization()(x)
         return x
-
-
-def slice_features(feature, output_composition):
-    index = 0
-    slices = dict()
-    for name, channel in output_composition:
-        slices[name] = feature[..., index:index+channel]
-        index += channel
-    return slices

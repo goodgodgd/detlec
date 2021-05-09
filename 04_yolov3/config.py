@@ -55,7 +55,7 @@ class Config:
             @classmethod
             def set_out_channel(cls):
                 num_cats = len(Config.Tfrdata.CATEGORY_NAMES)
-                Config.Model.Output.OUT_COMPOSITION = [('yxhw', 4), ('object', 1), ('cat_pr', num_cats)]
+                Config.Model.Output.OUT_COMPOSITION = [('bbox', 4), ('object', 1), ('category', num_cats)]
                 Config.Model.Output.OUT_CHANNELS = sum([val for key, val in Config.Model.Output.OUT_COMPOSITION])
 
         class Structure:
@@ -94,6 +94,29 @@ class Config:
             return cls.Train.BATCH_SIZE, imsize[0] // scale_div, imsize[1] // scale_div, 3
         else:
             assert 0, f"Invalid code: {code}"
+
+    @classmethod
+    def get_valid_category_mask(cls, dataset="kitti"):
+        """
+        :param dataset: dataset name
+        :return: binary mask e.g. when
+            Tfrdata.CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"] and
+            Dataset.CATEGORIES_TO_USE = ["Pedestrian", "Car", "Van", "Truck"]
+            Dataset.CATEGORY_REMAP = {"Pedestrian": "Person"}
+            this function returns [1 1 1 0] because ["Person", "Car", "Van"] are included in dataset categories
+            but "Bicycle" is not
+        """
+        dataset_cfg = cls.Datasets.get_dataset_config(dataset)
+        renamed_categories = [dataset_cfg.CATEGORY_REMAP[categ] if categ in dataset_cfg.CATEGORY_REMAP else categ
+                              for categ in dataset_cfg.CATEGORIES_TO_USE]
+
+        mask = np.zeros((len(cls.Tfrdata.CATEGORY_NAMES), ), dtype=np.int32)
+        for categ in renamed_categories:
+            if categ in cls.Tfrdata.CATEGORY_NAMES:
+                index = cls.Tfrdata.CATEGORY_NAMES.index(categ)
+                mask[index] = 1
+        return mask
+
 
 
 Config.Tfrdata.set_anchors()
