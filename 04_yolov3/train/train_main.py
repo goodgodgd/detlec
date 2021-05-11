@@ -35,10 +35,10 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
         get_dataset(tfrd_path, dataset_name, False, batch_size, "train")
     dataset_val, val_steps, _, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
 
-    model, loss, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
+    model, loss_object, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
                                                    learning_rate, loss_weights, valid_category)
-    trainer = tv.trainer_factory(train_mode, model, loss, optimizer, train_steps)
-    validater = tv.validater_factory(train_mode, model, loss, val_steps)
+    trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
+    validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
     logger = Logger()
 
     for epoch in range(start_epoch, end_epoch):

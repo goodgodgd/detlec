@@ -5,18 +5,18 @@ import utils.util_function as uf
 from train.logger import ModelLog
 
 
-def trainer_factory(mode, model, loss, optimizer, steps):
+def trainer_factory(mode, model, loss_object, optimizer, steps):
     if mode == "eager":
-        return ModelEagerTrainer(model, loss, optimizer, steps)
+        return ModelEagerTrainer(model, loss_object, optimizer, steps)
     elif mode == "graph":
-        return ModelGraphTrainer(model, loss, optimizer, steps)
+        return ModelGraphTrainer(model, loss_object, optimizer, steps)
 
 
-def validater_factory(mode, model, loss, steps):
+def validater_factory(mode, model, loss_object, steps):
     if mode == "eager":
-        return ModelEagerValidater(model, loss, steps)
+        return ModelEagerValidater(model, loss_object, steps)
     elif mode == "graph":
-        return ModelGraphValidater(model, loss, steps)
+        return ModelGraphValidater(model, loss_object, steps)
 
 
 class TrainValBase:
@@ -32,8 +32,8 @@ class TrainValBase:
         self.model_log.clear()
         for step, features in enumerate(dataset):
             start = time.time()
-            outputs = self.run_batch(features)
-            self.model_log.append_batch_result(outputs)
+            total_loss, loss_by_type, preds = self.run_batch(features)
+            self.model_log.append_batch_result(total_loss, loss_by_type, preds)
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
                               f"time={time.time() - start:.2f}... ")
             if step > 20:
@@ -44,7 +44,7 @@ class TrainValBase:
         return self.model_log
 
     def run_batch(self, features):
-        pass
+        raise NotImplementedError()
 
 
 class ModelEagerTrainer(TrainValBase):

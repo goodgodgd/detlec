@@ -25,6 +25,7 @@ class IntegratedLoss:
     def __call__(self, features, predictions):
         scales = [key for key in features if "feature_" in key]
         total_loss = 0
+        loss_by_type = dict()
         for scale_name in scales:
             suffix = scale_name[-2:]
             grtr = uf.merge_dim_hwa(features[scale_name])
@@ -33,13 +34,11 @@ class IntegratedLoss:
             pred = uf.slice_features(pred)
             auxi = self.prepare_auxiliary_data(grtr, pred, scale_name)
 
-            loss_values = dict()
             for loss_name, loss_object in self.loss_objects.items():
-                loss_values[loss_name + suffix] = loss_object(grtr, pred, auxi)
-
-            for loss_name, loss_value in loss_values:
-                total_loss += loss_value * self.loss_weights[loss_name]
-        return total_loss
+                scalar_loss, loss_map = loss_object(grtr, pred, auxi)
+                total_loss += scalar_loss * self.loss_weights[loss_name]
+                loss_by_type[loss_name + suffix] = loss_map
+        return total_loss, loss_by_type
 
     def prepare_auxiliary_data(self, grtr, pred, scale_name):
         auxiliary = dict()

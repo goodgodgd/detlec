@@ -15,7 +15,7 @@ class ModelLog:
         self.batch = dict()
         self.epoch = dict()
 
-    def append_batch_result(self, outputs):
+    def append_batch_result(self, total_loss, loss_by_type, preds):
         pass
 
     def append_epoch_result(self, **kwargs):
