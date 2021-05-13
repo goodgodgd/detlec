@@ -61,17 +61,17 @@ def convert_box_format_yxhw_to_tlbr(boxes_yxhw):
 
 
 def concat_box_output(output, boxes):
-    num, dim = boxes.shape
+    num, dim = boxes.shape[-2:]
     # if there is more than bounding box, append it  e.g. category, distance
     if dim > 4:
-        auxi_data = boxes[4:]
+        auxi_data = boxes[..., 4:]
         output.append(auxi_data)
 
     if tf.is_tensor(boxes):
-        output = tf.concat(output, axis=-2)
+        output = tf.concat(output, axis=-1)
         output = tf.cast(output, boxes.dtype)
     else:
-        output = np.concatenate(output, axis=-2)
+        output = np.concatenate(output, axis=-1)
         output = output.astype(boxes.dtype)
     return output
 
@@ -101,12 +101,12 @@ def compute_iou_aligned(grtr_yxwh, pred_yxwh, grtr_tlbr=None, pred_tlbr=None):
     :param pred_yxwh: ordered predicted bounding box in yxhw format (batch, HWA, 4)
     :return: iou (batch, HWA)
     """
-    if not grtr_tlbr:
+    if grtr_tlbr is None:
         grtr_tlbr = convert_box_format_yxhw_to_tlbr(grtr_yxwh)
-    if not pred_tlbr:
+    if pred_tlbr is None:
         pred_tlbr = convert_box_format_yxhw_to_tlbr(pred_yxwh)
-    inter_tl_min = tf.maximum(grtr_tlbr[:2], pred_tlbr[:2])
-    inter_br_max = tf.maximum(grtr_tlbr[2:4], pred_tlbr[2:4])
+    inter_tl_min = tf.maximum(grtr_tlbr[..., :2], pred_tlbr[..., :2])
+    inter_br_max = tf.maximum(grtr_tlbr[..., 2:4], pred_tlbr[..., 2:4])
     inter_hw = inter_br_max - inter_tl_min
     positive_mask = tf.cast(inter_hw > 0, dtype=tf.float32)
     inter_hw = inter_hw * positive_mask

@@ -68,17 +68,14 @@ class ObjectnessLoss:
         grtr_obj = grtr["object"]
         pred_obj = pred["object"]
         # object_mask: (batch, HWA, 1), object_count: scalar
-        object_mask, object_count = grtr["object"], auxi["object_count"]
+        object_mask, object_count = grtr["object"][..., 0], auxi["object_count"]
         # objectness loss
         obj_loss = tf.keras.losses.binary_crossentropy(grtr_obj, pred_obj)
-        print("=== obj_loss", obj_loss.shape)
         # to equally weight positive and negative samples, average them separately
         obj_positive = tf.reduce_sum(obj_loss * object_mask) / object_count
-        obj_negative = tf.reduce_sum(obj_loss * (1. - object_mask)) / (tf.size(object_mask) - object_count)
+        negative_count = tf.cast(tf.size(object_mask), tf.float32) - object_count
+        obj_negative = tf.reduce_sum(obj_loss * (1. - object_mask)) / negative_count
         scalar_loss = obj_positive + obj_negative
-        # if there is weight difference among scales
-        if "scale_weight" in auxi:
-            scalar_loss *= auxi["scale_weight"]
         return scalar_loss, obj_loss
 
 
@@ -90,15 +87,18 @@ class CategoryLoss:
         :param auxi: auxiliary data
         :return: category loss (batch, HWA)
         """
-        grtr_cate = grtr["category"]
-        pred_cate = pred["category"]
-        # object_mask: (batch, HWA, 1), object_count: scalar, valid_category: (1, 1, K)
+        grtr_cate = grtr["category"][..., 0]            # (batch, HWA)
+        pred_cate = pred["category"][..., tf.newaxis]   # (batch, HWA, K, 1)
+        # object_mask: (batch, HWA, 1), object_count: scalar, valid_category: (K)
         object_mask, object_count, valid_category = grtr["object"], auxi["object_count"], auxi["valid_category"]
-        grtr_cate = tf.one_hot(grtr_cate, depth=valid_category.shape[-1], axis=-1)
+        grtr_cate_indices = tf.cast(grtr_cate, dtype=tf.int32)
+        # (batch, HWA, K, 1)
+        grtr_cate_onehot = tf.one_hot(grtr_cate_indices, depth=valid_category.shape[0], axis=-1)[..., tf.newaxis]
 
         # category loss: binary cross entropy per category for multi-label classification (batch, HWA, K)
-        cate_loss = tf.keras.losses.binary_crossentropy(grtr_cate, pred_cate, label_smoothing=0.05)
-        print("=== cate_loss", cate_loss.shape)
+        cate_loss = tf.keras.losses.binary_crossentropy(grtr_cate_onehot, pred_cate, label_smoothing=0.05)
+        valid_category = tf.reshape(valid_category, (1, 1, valid_category.shape[0]))
+        valid_category = tf.cast(valid_category, tf.float32)
         cate_loss = cate_loss * valid_category
         # cate_loss_reduced: (batch, HWA, 1)
         cate_loss_reduced = tf.reduce_sum(cate_loss, axis=-1, keepdims=True)

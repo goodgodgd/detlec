@@ -7,7 +7,7 @@ import pandas as pd
 from config import Config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
 from model.model_factory import ModelFactory
-from train.loss_integration import IntegratedLoss
+from train.loss_factory import IntegratedLoss
 from train.logger import Logger
 import train.train_val as tv
 import utils.util_function as uf
@@ -36,7 +36,7 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
     dataset_val, val_steps, _, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
 
     model, loss_object, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
-                                                   learning_rate, loss_weights, valid_category)
+                                                          learning_rate, loss_weights, valid_category)
     trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
     validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
     logger = Logger()

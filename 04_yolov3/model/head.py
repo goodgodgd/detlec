@@ -85,8 +85,8 @@ class FeatureDecoder:
         slices = uf.slice_features(feature)
         anchors_ratio = self.anchors_per_scale[scale_name.replace("feature", "anchor")]
 
-        box_yx = self.decode_yx(slices["bbox"][:2])
-        box_hw = self.decode_hw(slices["bbox"][2:], anchors_ratio)
+        box_yx = self.decode_yx(slices["bbox"][..., :2])
+        box_hw = self.decode_hw(slices["bbox"][..., 2:], anchors_ratio)
         objectness = tf.sigmoid(slices["object"])
         cat_probs = tf.sigmoid(slices["category"])
 
