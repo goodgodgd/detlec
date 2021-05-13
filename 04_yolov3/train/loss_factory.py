@@ -36,6 +36,8 @@ class IntegratedLoss:
             for loss_name, loss_object in self.loss_objects.items():
                 scalar_loss, loss_map = loss_object(grtr, pred, auxi)
                 sc_loss_name = loss_name + scale_suffix
+                # in order to assign different weights by scale,
+                # set different weights for loss names with scale suffices in LossComb class
                 weight = self.loss_weights[sc_loss_name] if sc_loss_name in self.loss_weights \
                                                          else self.loss_weights[loss_name]
                 total_loss += scalar_loss * weight

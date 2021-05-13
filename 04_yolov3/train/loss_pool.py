@@ -85,7 +85,7 @@ class CategoryLoss:
         :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, dim), ...}
         :param pred: dict of merged pred. feature map slices, {key: (batch, HWA, dim), ...}
         :param auxi: auxiliary data
-        :return: category loss (batch, HWA)
+        :return: category loss (batch, HWA, K)
         """
         grtr_cate = grtr["category"][..., 0]            # (batch, HWA)
         pred_cate = pred["category"][..., tf.newaxis]   # (batch, HWA, K, 1)
@@ -101,7 +101,7 @@ class CategoryLoss:
         valid_category = tf.cast(valid_category, tf.float32)
         cate_loss = cate_loss * valid_category
         # cate_loss_reduced: (batch, HWA, 1)
-        cate_loss_reduced = tf.reduce_sum(cate_loss, axis=-1, keepdims=True)
+        cate_loss_reduced = tf.reduce_sum(cate_loss, axis=-1, keepdims=True) / tf.reduce_sum(valid_category)
         scalar_loss = tf.reduce_sum(cate_loss_reduced * object_mask) / object_count
         return scalar_loss, cate_loss
 

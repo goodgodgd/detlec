@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 
+import settings
 from config import Config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
 from model.model_factory import ModelFactory
@@ -11,7 +12,6 @@ from train.loss_factory import IntegratedLoss
 from train.logger import Logger
 import train.train_val as tv
 import utils.util_function as uf
-import settings
 
 
 def train_main():

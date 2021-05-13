@@ -25,23 +25,22 @@ class TrainValBase:
         self.loss_object = loss_object
         self.optimizer = optimizer
         self.epoch_steps = epoch_steps
-        self.model_log = ModelLog()
 
     def run_epoch(self, dataset):
         epoch_start = time.time()
-        self.model_log.clear()
+        model_log = ModelLog()
         for step, features in enumerate(dataset):
             start = time.time()
-            total_loss, loss_by_type, preds = self.run_batch(features)
-            self.model_log.append_batch_result(total_loss, loss_by_type, preds)
+            prediction, total_loss, loss_by_type = self.run_batch(features)
+            model_log.append_batch_result(step, features, prediction, total_loss, loss_by_type)
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
-                              f"time={time.time() - start:.2f}... ")
-            if step > 20:
-                break
+                              f"time={time.time() - start:.3f}... ")
+            # if step > 20:
+            #     break
 
         print("")
-        self.model_log.append_epoch_result(time=time.time() - epoch_start)
-        return self.model_log
+        model_log.append_epoch_result(time=time.time() - epoch_start)
+        return model_log
 
     def run_batch(self, features):
         raise NotImplementedError()
@@ -56,12 +55,12 @@ class ModelEagerTrainer(TrainValBase):
 
     def train_step(self, features):
         with tf.GradientTape() as tape:
-            preds = self.model(features["image"])
-            total_loss, loss_by_type = self.loss_object(features, preds)
+            prediction = self.model(features["image"])
+            total_loss, loss_by_type = self.loss_object(features, prediction)
 
         grads = tape.gradient(total_loss, self.model.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
-        return total_loss, loss_by_type, preds
+        return prediction, total_loss, loss_by_type
 
 
 class ModelGraphTrainer(ModelEagerTrainer):
@@ -81,9 +80,9 @@ class ModelEagerValidater(TrainValBase):
         return self.validate_step(features)
 
     def validate_step(self, features):
-        preds = self.model(features["image"])
-        total_loss, loss_by_type = self.loss_object(features, preds)
-        return total_loss, loss_by_type, preds
+        prediction = self.model(features["image"])
+        total_loss, loss_by_type = self.loss_object(features, prediction)
+        return prediction, total_loss, loss_by_type
 
 
 class ModelGraphValidater(ModelEagerValidater):
