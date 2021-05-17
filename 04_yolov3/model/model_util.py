@@ -23,7 +23,7 @@ class CustomConv2D:
 
         x = layers.Conv2D(filters, self.kernel_size, self.strides, self.padding,
                           use_bias=not self.bn, kernel_regularizer=tf.keras.regularizers.l2(0.01),
-                          kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                          kernel_initializer=tf.random_normal_initializer(stddev=0.0001),
                           bias_initializer=tf.constant_initializer(0.), name=name,
                           )(x)
 

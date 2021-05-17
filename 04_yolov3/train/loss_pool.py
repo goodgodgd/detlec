@@ -38,10 +38,9 @@ class CiouLoss(LossBase):
         pred_tlbr = uf.convert_box_format_yxhw_to_tlbr(pred_yxhw)
         # iou: (batch, HWA)
         iou = uf.compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr, pred_tlbr)
-
         cbox_tl = tf.minimum(grtr_tlbr[..., :2], pred_tlbr[..., :2])
-        cbox_br = tf.minimum(grtr_tlbr[..., 2:], pred_tlbr[..., 2:])
-        cbox_hw = tf.maximum(cbox_br - cbox_tl, 0.0)
+        cbox_br = tf.maximum(grtr_tlbr[..., 2:], pred_tlbr[..., 2:])
+        cbox_hw = cbox_br - cbox_tl
         c = tf.reduce_sum(cbox_hw * cbox_hw, axis=-1)
         center_diff = grtr_yxhw[..., :2] - pred_yxhw[..., :2]
         u = tf.reduce_sum(center_diff * center_diff, axis=-1)

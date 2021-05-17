@@ -75,6 +75,8 @@ class FeatureDecoder:
         :param anchors_per_scale: anchor box sizes in ratio per scale
         """
         self.anchors_per_scale = anchors_per_scale
+        self.const_3 = tf.constant(3, dtype=tf.float32)
+        self.const_log_2 = tf.math.log(tf.constant(2, dtype=tf.float32))
 
     def __call__(self, feature, scale_name: str):
         """
@@ -127,7 +129,10 @@ class FeatureDecoder:
         """
         num_anc, channel = anchors_ratio.shape     # (3, 2)
         anchors_tf = tf.reshape(anchors_ratio, (1, 1, 1, num_anc, channel))
-        hw_dec = tf.exp(hw_raw) * anchors_tf
+        # Note: exp activation may result in infinity
+        # hw_dec = tf.exp(hw_raw) * anchors_tf
+        # hw_dec: 0~3 times of anchor, the delayed sigmoid passes through (0, 1)
+        hw_dec = self.const_3 * tf.sigmoid(hw_raw - self.const_log_2) * anchors_tf
         return hw_dec
 
 

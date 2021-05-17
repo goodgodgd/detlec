@@ -18,19 +18,17 @@ class ModelLog:
     def __init__(self):
         self.batch = pd.DataFrame()
         self.epoch = dict()
-        self.verbose = False
 
     def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
-        self.verbose = (step % 100 == 10)
         loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
         batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
         batch_data["total_loss"] = total_loss.numpy()
         objectness = self.analyze_objectness(grtr, pred)
         batch_data.update(objectness)
-        if self.verbose:
-            print("")
-            self.check_pred_scales(pred)
-            print("---batch data:", batch_data)
+        self.check_nan(batch_data, grtr, pred)
+        # self.check_pred_scales(pred)
+        if step % 100 == 10:
+            print("--- batch_data:", batch_data)
         self.batch.append(batch_data, ignore_index=True)
 
     def analyze_objectness(self, grtr, pred):
@@ -53,6 +51,22 @@ class ModelLog:
             neg_obj += tf.reduce_mean(neg_obj_map)
         objectness = {"pos_obj": pos_obj.numpy() / len(scales), "neg_obj": neg_obj.numpy() / len(scales)}
         return objectness
+
+    def check_nan(self, losses, grtr, pred):
+        valid_result = True
+        for name, loss in losses.items():
+            if np.isnan(loss) or np.isinf(loss):
+                print(f"nan loss: {name}, {loss}")
+                valid_result = False
+        for name, tensor in pred.items():
+            if np.isnan(tensor.numpy()).any():
+                print(f"nan pred:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
+                valid_result = False
+        for name, tensor in grtr.items():
+            if np.isnan(tensor.numpy()).any():
+                print(f"nan grtr:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
+                valid_result = False
+        assert valid_result
 
     def check_pred_scales(self, pred):
         raw_features = {key: tensor for key, tensor in pred.items() if key.endswith("raw")}

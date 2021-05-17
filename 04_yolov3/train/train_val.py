@@ -91,5 +91,5 @@ class ModelGraphValidater(ModelEagerValidater):
 
     @tf.function
     def run_batch(self, features):
-        self.validate_step(features)
+        return self.validate_step(features)
 

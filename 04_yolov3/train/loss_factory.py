@@ -47,7 +47,7 @@ class IntegratedLoss:
 
     def prepare_auxiliary_data(self, grtr, pred):
         auxiliary = dict()
-        # As obj_count is used as a denominator, it must NOT be 0.
+        # As object_count is used as a denominator, it must NOT be 0.
         auxiliary["object_count"] = tf.maximum(tf.reduce_sum(grtr["object"]), 1)
         auxiliary["valid_category"] = self.valid_category
         return auxiliary

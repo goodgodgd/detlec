@@ -61,12 +61,12 @@ class Config:
         class Structure:
             BACKBONE = "Darknet53"
             HEAD = "FPN"
-            BACKBONE_CONV_ARGS = {"activation": "leaky_relu", "scope": "back"}
-            HEAD_CONV_ARGS = {"activation": "leaky_relu", "scope": "head"}
+            BACKBONE_CONV_ARGS = {"activation": "mish", "scope": "back"}
+            HEAD_CONV_ARGS = {"activation": "mish", "scope": "head"}
 
     class Train:
         CKPT_NAME = "yolo"
-        MODE = ["eager", "graph"][0]
+        MODE = ["eager", "graph"][1]
         BATCH_SIZE = 2
         TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
 
