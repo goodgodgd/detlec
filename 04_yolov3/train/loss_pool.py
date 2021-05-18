@@ -44,10 +44,14 @@ class CiouLoss(LossBase):
         c = tf.reduce_sum(cbox_hw * cbox_hw, axis=-1)
         center_diff = grtr_yxhw[..., :2] - pred_yxhw[..., :2]
         u = tf.reduce_sum(center_diff * center_diff, axis=-1)
-        d = tf.math.divide_no_nan(u, c)
+        # NOTE: divide_no_nan results in nan gradient
+        # d = tf.math.divide_no_nan(u, c)
+        d = u / (c + 1.0e-5)
 
-        grtr_hw_ratio = tf.math.divide_no_nan(grtr_yxhw[..., 2], grtr_yxhw[..., 3])
-        pred_hw_ratio = tf.math.divide_no_nan(pred_yxhw[..., 2], pred_yxhw[..., 3])
+        # grtr_hw_ratio = tf.math.divide_no_nan(grtr_yxhw[..., 2], grtr_yxhw[..., 3])
+        # pred_hw_ratio = tf.math.divide_no_nan(pred_yxhw[..., 2], pred_yxhw[..., 3])
+        grtr_hw_ratio = grtr_yxhw[..., 2] / (grtr_yxhw[..., 3] + 1.0e-5)
+        pred_hw_ratio = pred_yxhw[..., 2] / (pred_yxhw[..., 3] + 1.0e-5)
         coeff = tf.convert_to_tensor(4.0 / (np.pi * np.pi), dtype=tf.float32)
         v = coeff * tf.pow((tf.atan(grtr_hw_ratio) - tf.atan(pred_hw_ratio)), 2)
         alpha = v / (1 - iou + v)
@@ -56,7 +60,7 @@ class CiouLoss(LossBase):
         return loss
 
 
-class ObjectnessLoss:
+class ObjectnessLoss(LossBase):
     def __call__(self, grtr, pred, auxi):
         """
         :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, dim), ...}
@@ -78,7 +82,7 @@ class ObjectnessLoss:
         return scalar_loss, obj_loss
 
 
-class CategoryLoss:
+class CategoryLoss(LossBase):
     def __call__(self, grtr, pred, auxi):
         """
         :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, dim), ...}

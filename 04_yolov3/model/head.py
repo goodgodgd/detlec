@@ -129,7 +129,7 @@ class FeatureDecoder:
         """
         num_anc, channel = anchors_ratio.shape     # (3, 2)
         anchors_tf = tf.reshape(anchors_ratio, (1, 1, 1, num_anc, channel))
-        # Note: exp activation may result in infinity
+        # NOTE: exp activation may result in infinity
         # hw_dec = tf.exp(hw_raw) * anchors_tf
         # hw_dec: 0~3 times of anchor, the delayed sigmoid passes through (0, 1)
         hw_dec = self.const_3 * tf.sigmoid(hw_raw - self.const_log_2) * anchors_tf
