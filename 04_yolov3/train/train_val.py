@@ -60,8 +60,7 @@ class ModelEagerTrainer(TrainValBase):
             total_loss, loss_by_type = self.loss_object(features, prediction)
 
         grads = tape.gradient(total_loss, self.model.trainable_weights)
-        valid_grads = [tf.where(tf.math.is_nan(grad), 0., grad) for grad in grads]
-        self.optimizer.apply_gradients(zip(valid_grads, self.model.trainable_weights))
+        self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
         return prediction, total_loss, loss_by_type
 
 
