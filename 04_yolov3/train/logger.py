@@ -1,8 +1,11 @@
+import os.path as op
 import numpy as np
 import tensorflow as tf
 import pandas as pd
+from timeit import default_timer as timer
 
 import utils.util_function as uf
+from config import Config as cfg
 
 
 class Logger:
@@ -10,14 +13,35 @@ class Logger:
         pass
 
     def save_log(self, epoch, train_log, val_log):
-        print("save_log() will be implemented")
-        pass
+        summary = self.merge_logs(epoch, train_log, val_log)
+        filename = op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME, "history.csv")
+        if op.isfile(filename):
+            history = pd.read_csv(filename, encoding='utf-8', converters={'epoch': lambda c: int(c)})
+            history = history.append(summary, ignore_index=True)
+        else:
+            history = pd.DataFrame([summary])
+        print("=== history\n", history)
+        history["epoch"] = history["epoch"].astype(int)
+        history.to_csv(filename, encoding='utf-8', index=False, float_format='%.4f')
+
+    def merge_logs(self, epoch, train_log, val_log):
+        summary = dict()
+        summary["epoch"] = epoch
+        train_summary = train_log.get_summary()
+        train_summary = {"!" + key: val for key, val in train_summary.items()}
+        summary.update(train_summary)
+        summary["|"] = 0
+        val_summary = val_log.get_summary()
+        val_summary = {"`" + key: val for key, val in val_summary.items()}
+        summary.update(val_summary)
+        return summary
 
 
 class ModelLog:
     def __init__(self):
         self.batch = pd.DataFrame()
-        self.epoch = dict()
+        self.start = timer()
+        self.summary = dict()
 
     def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
         loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
@@ -25,11 +49,13 @@ class ModelLog:
         batch_data["total_loss"] = total_loss.numpy()
         objectness = self.analyze_objectness(grtr, pred)
         batch_data.update(objectness)
+
         self.check_nan(batch_data, grtr, pred)
-        # self.check_pred_scales(pred)
-        if step % 100 == 10:
-            print("--- batch_data:", batch_data)
-        self.batch.append(batch_data, ignore_index=True)
+        batch_data = self.set_precision(batch_data, 5)
+        self.batch = self.batch.append(batch_data, ignore_index=True)
+        # if step % 100 == 10:
+        #     self.check_pred_scales(pred)
+        #     print("--- batch_data:", batch_data)
 
     def analyze_objectness(self, grtr, pred):
         pos_obj, neg_obj = 0, 0
@@ -75,6 +101,14 @@ class ModelLog:
             pred_scales[key] = np.quantile(feat.numpy(), np.array([0.05, 0.5, 0.95]))
         print("--- pred_scales:", pred_scales)
 
-    def append_epoch_result(self, **kwargs):
-        self.epoch = kwargs
+    def set_precision(self, logs, precision):
+        new_logs = {key: np.around(val, precision) for key, val in logs.items()}
+        return new_logs
 
+    def finish(self):
+        self.summary = self.batch.mean(axis=0).to_dict()
+        self.summary["time_m"] = round((timer() - self.start)/60., 5)
+        print("finish:", self.summary)
+    
+    def get_summary(self):
+        return self.summary

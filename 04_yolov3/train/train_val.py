@@ -1,6 +1,7 @@
 import tensorflow as tf
+import numpy as np
+from timeit import default_timer as timer
 
-import time
 import utils.util_function as uf
 from train.logger import ModelLog
 
@@ -27,19 +28,24 @@ class TrainValBase:
         self.epoch_steps = epoch_steps
 
     def run_epoch(self, dataset):
-        epoch_start = time.time()
         model_log = ModelLog()
         for step, features in enumerate(dataset):
-            start = time.time()
+            start = timer()
             prediction, total_loss, loss_by_type = self.run_batch(features)
             model_log.append_batch_result(step, features, prediction, total_loss, loss_by_type)
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
-                              f"time={time.time() - start:.3f}... ")
+                              f"time={timer() - start:.3f}, "
+                              f"feat_dl_max={np.around(np.max(np.abs(prediction['feature_l'].numpy())), 5)}, "
+                              f"feat_rl_max={np.around(np.max(np.abs(prediction['feature_l_raw'].numpy())), 5)}, "
+                              f"back_rl_max={np.around(np.max(np.abs(prediction['backbone_l_raw'].numpy())), 5)}, "
+                              )
+            if step % 200 == 10:
+                print("")
             # if step > 20:
             #     break
 
         print("")
-        model_log.append_epoch_result(time=time.time() - epoch_start)
+        model_log.finish()
         return model_log
 
     def run_batch(self, features):
@@ -58,9 +64,32 @@ class ModelEagerTrainer(TrainValBase):
             prediction = self.model(features["image"])
             total_loss, loss_by_type = self.loss_object(features, prediction)
 
+        self.check_nan(loss_by_type, features, prediction)
         grads = tape.gradient(total_loss, self.model.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
         return prediction, total_loss, loss_by_type
+
+    def check_nan(self, losses, grtr, pred):
+        for name, loss in losses.items():
+            loss = loss.numpy()
+            if (loss.size > 1) and np.isnan(loss).any():
+                print(f"[train] nan loss:", name, np.quantile(loss, np.linspace(0, 1, 11)))
+            if loss.size == 1 and np.isnan(loss):
+                print(f"[train] nan loss:", name, loss)
+            if (loss.size > 1) and np.isinf(loss).any():
+                print(f"[train] inf loss:", name, np.quantile(loss, np.linspace(0, 1, 11)))
+            if loss.size == 1 and np.isinf(loss).any():
+                print(f"[train] inf loss:", name, loss)
+        for name, tensor in pred.items():
+            if np.isnan(tensor).any():
+                print(f"[train] nan pred:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
+            if np.isinf(tensor).any():
+                print(f"[train] inf pred:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
+        for name, tensor in grtr.items():
+            if np.isnan(tensor).any():
+                print(f"[train] nan grtr:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
+            if np.isinf(tensor).any():
+                print(f"[train] inf grtr:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
 
 
 class ModelGraphTrainer(ModelEagerTrainer):

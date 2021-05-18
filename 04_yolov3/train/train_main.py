@@ -77,7 +77,7 @@ def create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path, lea
 
 
 def save_model_ckpt(ckpt_path, model, weights_suffix='latest'):
-    ckpt_file = op.join(ckpt_path, f"yolo_{weights_suffix}.h5")
+    ckpt_file = op.join(ckpt_path, f"model_{weights_suffix}.h5")
     if not op.isdir(ckpt_path):
         os.makedirs(ckpt_path, exist_ok=True)
     print("=== save model:", ckpt_file)
@@ -85,7 +85,7 @@ def save_model_ckpt(ckpt_path, model, weights_suffix='latest'):
 
 
 def try_load_weights(ckpt_path, model, weights_suffix='latest'):
-    ckpt_file = op.join(ckpt_path, f"yolo_{weights_suffix}.h5")
+    ckpt_file = op.join(ckpt_path, f"model_{weights_suffix}.h5")
     if op.isfile(ckpt_file):
         print(f"===== Load weights from checkpoint: {ckpt_file}")
         model.load_weights(ckpt_file)
@@ -95,7 +95,7 @@ def try_load_weights(ckpt_path, model, weights_suffix='latest'):
 
 
 def read_previous_epoch(ckpt_path):
-    filename = op.join(ckpt_path, 'history.txt')
+    filename = op.join(ckpt_path, 'history.csv')
     if op.isfile(filename):
         history = pd.read_csv(filename, encoding='utf-8', converters={'epoch': lambda c: int(c)})
         if history.empty:

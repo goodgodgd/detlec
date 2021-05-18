@@ -65,8 +65,8 @@ class Config:
             HEAD_CONV_ARGS = {"activation": "mish", "scope": "head"}
 
     class Train:
-        CKPT_NAME = "yolo"
-        MODE = ["eager", "graph"][1]
+        CKPT_NAME = "yolo1"
+        MODE = ["eager", "graph"][0]
         BATCH_SIZE = 2
         TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
 
