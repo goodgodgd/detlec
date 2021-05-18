@@ -31,14 +31,11 @@ class TrainValBase:
         model_log = ModelLog()
         for step, features in enumerate(dataset):
             start = timer()
-            prediction, total_loss, loss_by_type, grad, weight = self.run_batch(features)
-            model_log.append_batch_result(step, features, prediction, total_loss, loss_by_type, grad, weight)
+            prediction, total_loss, loss_by_type = self.run_batch(features)
+            model_log.append_batch_result(step, features, prediction, total_loss, loss_by_type)
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
                               f"time={timer() - start:.3f}, "
-                              f"feat_dl_max={np.max(np.abs(prediction['feature_l'].numpy())):.5f}, "
-                              f"feat_rl_max={np.max(np.abs(prediction['feature_l_raw'].numpy())):.5f}, "
-                              f"back_rl_max={np.max(np.abs(prediction['backbone_l_raw'].numpy())):.5f}, "
-                              )
+                              f"loss={total_loss:.3f}, ")
             # if step > 20:
             #     break
 
@@ -65,7 +62,7 @@ class ModelEagerTrainer(TrainValBase):
         grads = tape.gradient(total_loss, self.model.trainable_weights)
         valid_grads = [tf.where(tf.math.is_nan(grad), 0., grad) for grad in grads]
         self.optimizer.apply_gradients(zip(valid_grads, self.model.trainable_weights))
-        return prediction, total_loss, loss_by_type, grads, self.model.trainable_weights
+        return prediction, total_loss, loss_by_type
 
 
 class ModelGraphTrainer(ModelEagerTrainer):
@@ -87,7 +84,7 @@ class ModelEagerValidater(TrainValBase):
     def validate_step(self, features):
         prediction = self.model(features["image"])
         total_loss, loss_by_type = self.loss_object(features, prediction)
-        return prediction, total_loss, loss_by_type, (tf.constant(0.),), (tf.constant(0.),)
+        return prediction, total_loss, loss_by_type
 
 
 class ModelGraphValidater(ModelEagerValidater):

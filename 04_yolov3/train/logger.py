@@ -44,14 +44,14 @@ class ModelLog:
         self.summary = dict()
         self.nan_grad_count = 0
 
-    def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type, grad, weight):
+    def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
         loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
         batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
         batch_data["total_loss"] = total_loss.numpy()
         objectness = self.analyze_objectness(grtr, pred)
         batch_data.update(objectness)
 
-        self.check_nan(batch_data, grtr, pred, grad, weight)
+        self.check_nan(batch_data, grtr, pred)
         batch_data = self.set_precision(batch_data, 5)
         self.batch = self.batch.append(batch_data, ignore_index=True)
         if step % 200 == 10:
@@ -79,7 +79,7 @@ class ModelLog:
         objectness = {"pos_obj": pos_obj.numpy() / len(scales), "neg_obj": neg_obj.numpy() / len(scales)}
         return objectness
 
-    def check_nan(self, losses, grtr, pred, grad, weight):
+    def check_nan(self, losses, grtr, pred):
         valid_result = True
         for name, loss in losses.items():
             if np.isnan(loss) or np.isinf(loss) or loss > 100:
@@ -94,29 +94,7 @@ class ModelLog:
                 print(f"nan grtr:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
                 valid_result = False
 
-        nan_grad = False
-        for index, tensor in enumerate(grad):
-            if index % 5 == 0:
-                if not np.isfinite(tensor.numpy()).all():
-                    print(f"nan grad:", index, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
-                    nan_grad = True
-
-        if nan_grad:
-            self.nan_grad_count += 1
-            for name, loss in losses.items():
-                print(f"invalid loss: {name}, {loss}")
-            for name, tensor in pred.items():
-                print(f"invalid pred:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
-            for name, tensor in grtr.items():
-                print(f"invalid grtr:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
-
-        for index, tensor in enumerate(weight):
-            if index % 5 ==0:
-                if (not np.isfinite(tensor.numpy()).all()) or nan_grad:
-                    print(f"nan weight:", index, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
-
         assert valid_result
-        assert self.nan_grad_count <= 3
 
     def check_pred_scales(self, pred):
         raw_features = {key: tensor for key, tensor in pred.items() if key.endswith("raw")}
