@@ -8,10 +8,7 @@ import utils.util_function as uf
 from config import Config as cfg
 
 
-class Logger:
-    def __init__(self):
-        pass
-
+class LogFile:
     def save_log(self, epoch, train_log, val_log):
         summary = self.merge_logs(epoch, train_log, val_log)
         filename = op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME, "history.csv")
@@ -37,7 +34,7 @@ class Logger:
         return summary
 
 
-class ModelLog:
+class LogData:
     def __init__(self):
         self.batch = pd.DataFrame()
         self.start = timer()
@@ -107,10 +104,10 @@ class ModelLog:
         new_logs = {key: np.around(val, precision) for key, val in logs.items()}
         return new_logs
 
-    def finish(self):
+    def finalize(self):
         self.summary = self.batch.mean(axis=0).to_dict()
         self.summary["time_m"] = round((timer() - self.start)/60., 5)
-        print("finish:", self.summary)
+        print("finalize:", self.summary)
     
     def get_summary(self):
         return self.summary

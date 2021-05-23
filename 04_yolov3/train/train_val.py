@@ -3,7 +3,7 @@ import numpy as np
 from timeit import default_timer as timer
 
 import utils.util_function as uf
-from train.logger import ModelLog
+from train.logger import LogData
 
 
 def trainer_factory(mode, model, loss_object, optimizer, steps):
@@ -28,11 +28,11 @@ class TrainValBase:
         self.epoch_steps = epoch_steps
 
     def run_epoch(self, dataset):
-        model_log = ModelLog()
+        logger = LogData()
         for step, features in enumerate(dataset):
             start = timer()
             prediction, total_loss, loss_by_type = self.run_batch(features)
-            model_log.append_batch_result(step, features, prediction, total_loss, loss_by_type)
+            logger.append_batch_result(step, features, prediction, total_loss, loss_by_type)
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
                               f"time={timer() - start:.3f}, "
                               f"loss={total_loss:.3f}, ")
@@ -40,8 +40,8 @@ class TrainValBase:
             #     break
 
         print("")
-        model_log.finish()
-        return model_log
+        logger.finalize()
+        return logger
 
     def run_batch(self, features):
         raise NotImplementedError()

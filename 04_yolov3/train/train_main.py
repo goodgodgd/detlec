@@ -9,7 +9,7 @@ from config import Config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
 from model.model_factory import ModelFactory
 from train.loss_factory import IntegratedLoss
-from train.logger import Logger
+from train.logger import LogFile
 import train.train_val as tv
 import utils.util_function as uf
 
@@ -39,14 +39,14 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
                                                           learning_rate, loss_weights, valid_category)
     trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
     validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
-    logger = Logger()
+    log_file = LogFile()
 
     for epoch in range(start_epoch, end_epoch):
         print(f"========== Start dataset : {dataset_name} epoch: {epoch + 1}/{end_epoch} ==========")
         train_result = trainer.run_epoch(dataset_train)
         val_result = validater.run_epoch(dataset_val)
         save_model_ckpt(ckpt_path, model)
-        logger.save_log(epoch, train_result, val_result)
+        log_file.save_log(epoch, train_result, val_result)
 
     if model_save:
         save_model_ckpt(ckpt_path, model, f"ep{end_epoch:02d}")
