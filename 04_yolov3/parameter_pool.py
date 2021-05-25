@@ -2,7 +2,8 @@ import numpy as np
 
 
 class LossComb:
-    STANDARD = {"ciou": 1., "objectness": 1., "category": 1.}
+    STANDARD = {"ciou": 1., "object": 1., "category": 1.}
+    SCALE_WEIGHT = {"ciou": 1., "object_l": 1., "object_m": 1., "object_s": 4., "category": 1.}
 
 
 class Anchor:

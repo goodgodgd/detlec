@@ -22,8 +22,9 @@ class CustomConv2D:
         name = f"{self.scope}/{name}" if self.scope else name
 
         x = layers.Conv2D(filters, self.kernel_size, self.strides, self.padding,
-                          use_bias=not self.bn, kernel_regularizer=tf.keras.regularizers.l2(0.0005),
-                          kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                          use_bias=not self.bn,
+                          kernel_regularizer=tf.keras.regularizers.l2(0.001),
+                          kernel_initializer=tf.random_normal_initializer(stddev=0.001),
                           bias_initializer=tf.constant_initializer(0.), name=name,
                           )(x)
 
@@ -35,12 +36,3 @@ class CustomConv2D:
         if self.bn:
             x = layers.BatchNormalization()(x)
         return x
-
-
-def slice_features(feature, output_composition):
-    index = 0
-    slices = dict()
-    for name, channel in output_composition:
-        slices[name] = feature[..., index:index+channel]
-        index += channel
-    return slices

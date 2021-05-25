@@ -15,7 +15,6 @@ class ModelFactory:
                  head_conv_args=cfg.Model.Structure.HEAD_CONV_ARGS,
                  num_anchors_per_scale=cfg.Model.Output.NUM_ANCHORS_PER_SCALE,
                  out_channels=cfg.Model.Output.OUT_CHANNELS,
-                 output_compos=cfg.Model.Output.OUT_COMPOSITION
                  ):
         self.batch_size = batch_size
         self.input_shape = input_shape
@@ -26,7 +25,6 @@ class ModelFactory:
         self.head_conv_args = head_conv_args
         self.num_anchors_per_scale = num_anchors_per_scale
         self.out_channels = out_channels
-        self.output_compos = output_compos
         mu.CustomConv2D.CALL_COUNT = -1
         print(f"[ModelFactory] batch size={batch_size}, input shape={input_shape}")
         print(f"[ModelFactory] backbone={self.backbone_name}, HEAD={self.head_name}")
@@ -38,9 +36,13 @@ class ModelFactory:
         backbone_features = backbone_model(input_tensor)
         head_features = head_model(backbone_features)
         output_features = dict()
-        decode_features = head.FeatureDecoder(self.output_compos, self.anchors_per_scale)
+        decode_features = head.FeatureDecoder(self.anchors_per_scale)
         for i, (scale, feature) in enumerate(head_features.items()):
             output_features[scale] = decode_features(feature, scale)
+        head_features = {key + "_raw": val for key, val in head_features.items()}
+        output_features.update(head_features)
+        backbone_features = {key + "_raw": val for key, val in backbone_features.items()}
+        output_features.update(backbone_features)
         yolo_model = tf.keras.Model(inputs=input_tensor, outputs=output_features, name="yolo_model")
         return yolo_model
 

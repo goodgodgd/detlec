@@ -3,6 +3,7 @@ import numpy as np
 
 from utils.util_class import MyExceptionToCatch
 import model.model_util as mu
+import utils.util_function as uf
 
 
 def head_factory(head, conv_args, num_anchors_per_scale, out_channels):
@@ -69,13 +70,13 @@ class FPN(HeadBase):
 
 
 class FeatureDecoder:
-    def __init__(self, output_compos, anchors_per_scale):
+    def __init__(self, anchors_per_scale):
         """
-        :param output_compos: Config.Model.Output.OUT_COMPOSITION
         :param anchors_per_scale: anchor box sizes in ratio per scale
         """
-        self.output_compos = output_compos
         self.anchors_per_scale = anchors_per_scale
+        self.const_3 = tf.constant(3, dtype=tf.float32)
+        self.const_log_2 = tf.math.log(tf.constant(2, dtype=tf.float32))
 
     def __call__(self, feature, scale_name: str):
         """
@@ -83,25 +84,24 @@ class FeatureDecoder:
         :param scale_name: scale name e.g. "feature_l"
         :return: decoded feature in the same shape e.g. (yxhw, objectness, category probabilities)
         """
-        slices = mu.slice_features(feature, self.output_compos)
+        slices = uf.slice_features(feature)
         anchors_ratio = self.anchors_per_scale[scale_name.replace("feature", "anchor")]
 
-        box_yx = self.decode_yx(slices["yxhw"])
-        box_hw = self.decode_hw(slices["yxhw"], anchors_ratio)
+        box_yx = self.decode_yx(slices["bbox"][..., :2])
+        box_hw = self.decode_hw(slices["bbox"][..., 2:], anchors_ratio)
         objectness = tf.sigmoid(slices["object"])
-        cat_probs = tf.sigmoid(slices["cat_pr"])
+        cat_probs = tf.sigmoid(slices["category"])
 
         bbox_pred = tf.concat([box_yx, box_hw, objectness, cat_probs], axis=-1)
         assert bbox_pred.shape == feature.shape
         return tf.cast(bbox_pred, dtype=tf.float32)
 
-    def decode_yx(self, yxhw_raw):
+    def decode_yx(self, yx_raw):
         """
-        :param yxhw_raw: (batch, grid_h, grid_w, anchor, 4)
+        :param yx_raw: (batch, grid_h, grid_w, anchor, 2)
         :return: yx_dec = yx coordinates of box centers in ratio to image (batch, grid_h, grid_w, anchor, 2)
         """
-        grid_h, grid_w = yxhw_raw.shape[1:3]
-        yx_raw = yxhw_raw[..., :2]
+        grid_h, grid_w = yx_raw.shape[1:3]
         """
         Original yolo v3 implementation: yx_dec = tf.sigmoid(yx_raw)
         For yx_dec to be close to 0 or 1, yx_raw should be -+ infinity
@@ -121,16 +121,18 @@ class FeatureDecoder:
         yx_dec = (yx_box + grid) / divider
         return yx_dec
 
-    def decode_hw(self, yxhw_raw, anchors_ratio):
+    def decode_hw(self, hw_raw, anchors_ratio):
         """
-        :param yxhw_raw: (batch, grid_h, grid_w, anchor, 4)
+        :param hw_raw: (batch, grid_h, grid_w, anchor, 2)
         :param anchors_ratio: [height, width]s of anchors in ratio to image (0~1), (anchor, 2)
         :return: hw_dec = heights and widths of boxes in ratio to image (batch, grid_h, grid_w, anchor, 2)
         """
-        hw_raw = yxhw_raw[..., 2:]
         num_anc, channel = anchors_ratio.shape     # (3, 2)
         anchors_tf = tf.reshape(anchors_ratio, (1, 1, 1, num_anc, channel))
-        hw_dec = tf.exp(hw_raw) * anchors_tf
+        # NOTE: exp activation may result in infinity
+        # hw_dec = tf.exp(hw_raw) * anchors_tf
+        # hw_dec: 0~3 times of anchor, the delayed sigmoid passes through (0, 1)
+        hw_dec = self.const_3 * tf.sigmoid(hw_raw - self.const_log_2) * anchors_tf
         return hw_dec
 
 

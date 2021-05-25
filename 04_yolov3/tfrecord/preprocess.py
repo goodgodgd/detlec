@@ -88,12 +88,12 @@ class ExampleCropper(PreprocessBase):
         if bboxes.size == 0:
             raise uc.MyExceptionToCatch("[get_bboxes] empty boxes")
         # clip into image range
-        bboxes = uf.convert_box_format_yxhw_to_2pt(bboxes)
+        bboxes = uf.convert_box_format_yxhw_to_tlbr(bboxes)
         bboxes[:, 0] = np.maximum(bboxes[:, 0], 0)
         bboxes[:, 1] = np.maximum(bboxes[:, 1], 0)
         bboxes[:, 2] = np.minimum(bboxes[:, 2], cropped_hw[0])
         bboxes[:, 3] = np.minimum(bboxes[:, 3], cropped_hw[1])
-        bboxes = uf.convert_box_format_2pt_to_yxhw(bboxes)
+        bboxes = uf.convert_box_format_tlbr_to_yxhw(bboxes)
         return bboxes
 
 
