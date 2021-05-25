@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 import tensorflow_addons as tfa
+import utils.util_function as uf
 
 
 class CustomConv2D:
@@ -36,3 +37,40 @@ class CustomConv2D:
         if self.bn:
             x = layers.BatchNormalization()(x)
         return x
+
+
+def non_maximum_suppression(pred):
+    """
+    :param pred: merged predictions, (batch, N, 5+K), N: sum of HWAs over scales(l,m,s)
+    :return:
+    """
+    pred = uf.slice_features(pred)
+    boxes = uf.convert_box_format_yxhw_to_tlbr(pred["bbox"])   # (batch, N, 4)
+    categories = tf.argmax(pred["category"], axis=-1)          # (batch, N)
+    batch, numbox, numctgr = pred["category"].shape
+
+    batch_result = [[] for i in range(batch)]
+    for ctgr_idx in range(numctgr):
+        ctgr_mask = tf.cast(categories == ctgr_idx, dtype=tf.float32)   # (batch, N)
+        ctgr_boxes = ctgr_mask[..., tf.newaxis] * boxes                 # (batch, N, 4)
+        ctgr_scores = pred["object"] * pred["category"][..., ctgr_idx] * ctgr_mask   # (batch, N)
+        for frame_idx in range(batch):
+            selected_indices, selected_scores = tf.image.non_max_suppression_with_scores(
+                boxes=ctgr_boxes,
+                scores=ctgr_scores,
+                max_output_size=50,
+                iou_threshold=0.5,
+                score_threshold=0.5,
+                soft_nms_sigma=0.5
+            )
+            # gather: box, scores, object, ctgr_prob
+            output = 0
+            batch_result[frame_idx].append(output)
+
+    batch_result = [tf.concat(ctgr_result, axis=-1) for ctgr_result in batch_result]
+    return batch_result
+
+
+def test_nms():
+    pass
+
