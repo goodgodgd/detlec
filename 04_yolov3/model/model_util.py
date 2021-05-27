@@ -131,16 +131,18 @@ def test_nms():
     np.set_printoptions(precision=4, suppress=True, linewidth=100)
     B, N = 4, 1000
     pred = tf.random.uniform((B, N, 9), dtype=tf.float32)
-    result = non_maximum_suppression_compare(pred, 18)
-    print(result[0].shape)
+    result = non_maximum_suppression_batch(pred, 18)
+    print(result.shape)
     print(result[0].numpy())
 
 
 def test_compare_nms():
     """
     compare fixed shape nms vs variable shape nms
-    [non_maximum_suppression_batch] mean time: 0.01789      (fixed shape)
-    [non_maximum_suppression_compare] mean time: 0.01803    (variable shape)
+    tested in laptop (RTX 2070)
+    test result:
+        [non_maximum_suppression_batch] mean time: 0.01789      (fixed shape)
+        [non_maximum_suppression_compare] mean time: 0.01803    (variable shape)
     """
     from timeit import default_timer as timer
     np.set_printoptions(precision=4, suppress=True, linewidth=100)
