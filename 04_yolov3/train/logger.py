@@ -36,7 +36,7 @@ class LogFile:
 
 class LogData:
     def __init__(self):
-        self.batch = pd.DataFrame()
+        self.batch_data_table = pd.DataFrame()
         self.start = timer()
         self.summary = dict()
         self.nan_grad_count = 0
@@ -50,7 +50,10 @@ class LogData:
 
         self.check_nan(batch_data, grtr, pred)
         batch_data = self.set_precision(batch_data, 5)
-        self.batch = self.batch.append(batch_data, ignore_index=True)
+        col_order = list(batch_data.keys())
+        self.batch_data_table = self.batch_data_table.append(batch_data, ignore_index=True)
+        self.batch_data_table = self.batch_data_table.loc[:, col_order]
+
         if step % 200 == 10:
             print("\n--- batch_data:", batch_data)
         #     self.check_pred_scales(pred)
@@ -105,7 +108,7 @@ class LogData:
         return new_logs
 
     def finalize(self):
-        self.summary = self.batch.mean(axis=0).to_dict()
+        self.summary = self.batch_data_table.mean(axis=0).to_dict()
         self.summary["time_m"] = round((timer() - self.start)/60., 5)
         print("finalize:", self.summary)
     

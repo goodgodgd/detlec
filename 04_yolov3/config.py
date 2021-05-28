@@ -65,7 +65,7 @@ class Config:
             HEAD_CONV_ARGS = {"activation": "leaky_relu", "scope": "head"}
 
     class Train:
-        CKPT_NAME = "yolo2"
+        CKPT_NAME = "yolo1"
         MODE = ["eager", "graph"][1]
         BATCH_SIZE = 2
         TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
