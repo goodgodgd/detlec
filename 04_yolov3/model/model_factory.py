@@ -14,7 +14,7 @@ class ModelFactory:
                  backbone_conv_args=cfg.Model.Structure.BACKBONE_CONV_ARGS,
                  head_conv_args=cfg.Model.Structure.HEAD_CONV_ARGS,
                  num_anchors_per_scale=cfg.Model.Output.NUM_ANCHORS_PER_SCALE,
-                 out_channels=cfg.Model.Output.OUT_CHANNELS,
+                 out_channels=cfg.Model.Output.FEATURE_CHANNELS,
                  ):
         self.batch_size = batch_size
         self.input_shape = input_shape

@@ -21,20 +21,19 @@ class IntegratedLoss:
             loss_objects["category"] = loss.CategoryLoss()
         return loss_objects
 
-    def __call__(self, features, predictions):
-        scales = [key for key in features if "feature_" in key]
+    def __call__(self, grtr, pred):
+        grtr_slices = uf.merge_and_slice_features(grtr, True)
+        pred_slices = uf.merge_and_slice_features(pred, False)
+        scales = [key for key in grtr_slices if "feature_" in key]
         total_loss = 0
         loss_by_type = {loss_name: 0 for loss_name in self.loss_objects}
+
         for scale_name in scales:
             scale_suffix = scale_name[-2:]  # "_l", "_m", "_s"
-            grtr = uf.merge_dim_hwa(features[scale_name])
-            grtr = uf.slice_features(grtr)
-            pred = uf.merge_dim_hwa(predictions[scale_name])
-            pred = uf.slice_features(pred)
-            auxi = self.prepare_auxiliary_data(grtr, pred)
+            auxi = self.prepare_auxiliary_data(grtr_slices[scale_name], pred_slices[scale_name])
 
             for loss_name, loss_object in self.loss_objects.items():
-                scalar_loss, loss_map = loss_object(grtr, pred, auxi)
+                scalar_loss, loss_map = loss_object(grtr_slices[scale_name], pred_slices[scale_name], auxi)
                 sc_loss_name = loss_name + scale_suffix
                 # in order to assign different weights by scale,
                 # set different weights for loss names with scale suffices in LossComb class

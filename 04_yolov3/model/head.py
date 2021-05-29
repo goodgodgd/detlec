@@ -84,7 +84,7 @@ class FeatureDecoder:
         :param scale_name: scale name e.g. "feature_l"
         :return: decoded feature in the same shape e.g. (yxhw, objectness, category probabilities)
         """
-        slices = uf.slice_features(feature)
+        slices = uf.slice_feature(feature, False)
         anchors_ratio = self.anchors_per_scale[scale_name.replace("feature", "anchor")]
 
         box_yx = self.decode_yx(slices["bbox"][..., :2])

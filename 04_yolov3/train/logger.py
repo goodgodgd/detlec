@@ -4,8 +4,9 @@ import tensorflow as tf
 import pandas as pd
 from timeit import default_timer as timer
 
-import utils.util_function as uf
 from config import Config as cfg
+import utils.util_function as uf
+from eval.metric import recall_precision
 
 
 class LogFile:
@@ -45,10 +46,17 @@ class LogData:
         loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
         batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
         batch_data["total_loss"] = total_loss.numpy()
+        # check_nan must be here!
+        self.check_nan(batch_data, grtr, pred)
+
+        grtr = uf.merge_and_slice_features(grtr, True)
+        pred = uf.merge_and_slice_features(pred, False)
+
         objectness = self.analyze_objectness(grtr, pred)
         batch_data.update(objectness)
+        # metric = recall_precision(grtr, pred)
+        # batch_data.update(metric)
 
-        self.check_nan(batch_data, grtr, pred)
         batch_data = self.set_precision(batch_data, 5)
         col_order = list(batch_data.keys())
         self.batch_data_table = self.batch_data_table.append(batch_data, ignore_index=True)
@@ -62,17 +70,14 @@ class LogData:
         pos_obj, neg_obj = 0, 0
         scales = [key for key in grtr if "feature_" in key]
         for scale_name in scales:
-            grtr_slices = uf.slice_features(grtr[scale_name])
-            pred_slices = uf.slice_features(pred[scale_name])
-            grtr_obj_mask = grtr_slices["object"]
-            pred_obj_prob = pred_slices["object"]
+            grtr_obj_mask = grtr[scale_name]["object"]      # (batch, HWA, 1)
+            pred_obj_prob = pred[scale_name]["object"]      # (batch, HWA, 1)
             obj_num = tf.maximum(tf.reduce_sum(grtr_obj_mask), 1)
             # average positive objectness probability
             pos_obj += tf.reduce_sum(grtr_obj_mask * pred_obj_prob) / obj_num
             # average top 50 negative objectness probabilities per frame
             neg_obj_map = (1. - grtr_obj_mask) * pred_obj_prob
-            batch, grid_h, grid_w, anchor, _ = neg_obj_map.shape
-            neg_obj_map = tf.reshape(neg_obj_map, (batch, grid_h * grid_w * anchor))
+            neg_obj_map = tf.squeeze(neg_obj_map)
             neg_obj_map = tf.sort(neg_obj_map, axis=-1, direction="DESCENDING")
             neg_obj_map = neg_obj_map[:, :50]
             neg_obj += tf.reduce_mean(neg_obj_map)

@@ -49,14 +49,16 @@ class Config:
             FEATURE_SCALES = {"feature_s": 8, "feature_m": 16, "feature_l": 32}
             FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
             NUM_ANCHORS_PER_SCALE = 3
-            OUT_CHANNELS = 0                    # assigned by set_out_channel()
-            OUT_COMPOSITION = ()                # assigned by set_out_channel()
+            FEATURE_CHANNELS = 0                    # assigned by set_out_channel()
+            GRTR_CHANNEL_COMPOSITION = ()       # assigned by set_out_channel()
+            PRED_CHANNEL_COMPOSITION = ()       # assigned by set_out_channel()
 
             @classmethod
             def set_out_channel(cls):
                 num_cats = len(Config.Tfrdata.CATEGORY_NAMES)
-                Config.Model.Output.OUT_COMPOSITION = [('bbox', 4), ('object', 1), ('category', num_cats)]
-                Config.Model.Output.OUT_CHANNELS = sum([val for key, val in Config.Model.Output.OUT_COMPOSITION])
+                Config.Model.Output.GRTR_CHANNEL_COMPOSITION = {'bbox': 4, 'object': 1, 'category': 1}
+                Config.Model.Output.PRED_CHANNEL_COMPOSITION = {'bbox': 4, 'object': 1, 'category': num_cats}
+                Config.Model.Output.FEATURE_CHANNELS = sum([val for key, val in Config.Model.Output.PRED_CHANNEL_COMPOSITION.items()])
 
         class Structure:
             BACKBONE = "Darknet53"

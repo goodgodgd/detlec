@@ -1,4 +1,5 @@
 import sys
+import copy
 import numpy as np
 import tensorflow as tf
 
@@ -76,12 +77,33 @@ def concat_box_output(output, boxes):
     return output
 
 
-def slice_features(feature, output_composition=cfg.Model.Output.OUT_COMPOSITION):
-    index = 0
-    slices = dict()
-    for name, channel in output_composition:
-        slices[name] = feature[..., index:index+channel]
-        index += channel
+def merge_and_slice_features(features, is_gt):
+    """
+    :param features: this dict has keys feature_l,m,s and corresponding tensors are in (batch, grid_h, grid_w, anchors, dims)
+    :param is_gt: is ground truth feature map?
+    :return: sliced feature maps in each scale
+    """
+    scales = [key for key in features if "feature" in key]  # ['feature_l', 'feature_m', 'feature_s']
+    new_features = {}
+    for key in scales:
+        raw_feat = features[key]
+        merged_feat = merge_dim_hwa(raw_feat)
+        slices = slice_feature(merged_feat, is_gt)
+        new_features[key] = slices
+    return new_features
+
+
+def slice_feature(feature, is_gt):
+    """
+    :param feature: (batch, grid_h, grid_w, anchors, dims)
+    :param is_gt: is ground truth feature map?
+    :return: sliced feature maps
+    """
+    channel_composition = cfg.Model.Output.GRTR_CHANNEL_COMPOSITION if is_gt else cfg.Model.Output.PRED_CHANNEL_COMPOSITION
+    names = [name for name, chan in channel_composition.items()]            # ['bbox', 'object', 'category', ...]
+    channels = [chan for name, chan in channel_composition.items()]         # [4, 1, 4, ...]
+    slices = tf.split(feature, channels, axis=-1)
+    slices = dict(zip(names, slices))           # slices = {'bbox': (B,H,W,A,4), 'object': (B,H,W,A,1), ...}
     return slices
 
 
