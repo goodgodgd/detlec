@@ -72,6 +72,11 @@ class Config:
         BATCH_SIZE = 2
         TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
 
+    class NMS:
+        MAX_OUT = 20
+        IOU_THRESH = 0.5
+        SCORE_THRESH = 0.5
+
     @classmethod
     def summary(cls):
         # return dict of important parameters

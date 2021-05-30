@@ -119,8 +119,8 @@ def merge_dim_hwa(feature_map):
 
 def compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):
     """
-    :param grtr_yxhw: ordered GT bounding boxes in yxhw format (batch, HWA, 4)
-    :param pred_yxhw: ordered predicted bounding box in yxhw format (batch, HWA, 4)
+    :param grtr_yxhw: GT bounding boxes in yxhw format (batch, HWA, D(>4))
+    :param pred_yxhw: predicted bounding boxes aligned with GT in yxhw format (batch, HWA, D(>4))
     :return: iou (batch, HWA)
     """
     if grtr_tlbr is None:
@@ -137,4 +137,66 @@ def compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):
     grtr_area = grtr_yxhw[..., 2] * grtr_yxhw[..., 3]
     iou = inter_area / (pred_area + grtr_area - inter_area + 0.00001)
     return iou
+
+
+def compute_iou_general(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):
+    """
+    :param grtr_yxhw: GT bounding boxes in yxhw format (batch, N1, D1(>4))
+    :param pred_yxhw: predicted bounding box in yxhw format (batch, N2, D2(>4))
+    :return: iou (batch, HWA)
+    """
+    grtr_yxhw = tf.expand_dims(grtr_yxhw, axis=-2)  # (batch, N1, 1, D1)
+    pred_yxhw = tf.expand_dims(pred_yxhw, axis=-3)  # (batch, 1, N2, D2)
+
+    if grtr_tlbr is None:
+        grtr_tlbr = convert_box_format_yxhw_to_tlbr(grtr_yxhw)  # (batch, N1, 1, D1)
+    if pred_tlbr is None:
+        pred_tlbr = convert_box_format_yxhw_to_tlbr(pred_yxhw)  # (batch, 1, N2, D2)
+
+    inter_tl = tf.maximum(grtr_tlbr[..., :2], pred_tlbr[..., :2])       # (batch, N1, N2, 2)
+    inter_br = tf.minimum(grtr_tlbr[..., 2:4], pred_tlbr[..., 2:4])     # (batch, N1, N2, 2)
+    inter_hw = inter_br - inter_tl                                      # (batch, N1, N2, 2)
+    inter_hw = tf.maximum(inter_hw, 0)
+    inter_area = inter_hw[..., 0] * inter_hw[..., 1]                    # (batch, N1, N2)
+
+    pred_area = pred_yxhw[..., 2] * pred_yxhw[..., 3]                   # (batch, 1, N2)
+    grtr_area = grtr_yxhw[..., 2] * grtr_yxhw[..., 3]                   # (batch, N1, 1)
+    iou = inter_area / (pred_area + grtr_area - inter_area + 1e-5)      # (batch, N1, N2)
+    return iou
+
+
+def test_iou_general():
+    print("===== start test_iou_general")
+    # iou([0.5, 0.5, 0.2, 0.4, 0], [0.6, 0.7, 0.4, 0.2, 0]) = 1/7
+    # iou([0.5, 0.5, 0.2, 0.4, 0], [0.4, 0.3, 0.4, 0.4, 0]) = 1/5
+    grtr = tf.constant([[[0.5, 0.5, 0.2, 0.4, 0],
+                         [0, 0, 0, 0, 1]],
+                        [[0.5, 0.5, 0.2, 0.4, 2],
+                         [0, 0, 0, 0, 3]],
+                        ], dtype=tf.float32)
+    pred = tf.constant([[[0, 0, 0, 0, 1],
+                         [0.6, 0.7, 0.4, 0.2, 0],
+                         [0.4, 0.3, 0.4, 0.4, 0]],
+                        [[0, 0, 0, 0, 1],
+                         [0.6, 0.7, 0.4, 0.2, 0],
+                         [0.4, 0.3, 0.4, 0.4, 0]],
+                        ], dtype=tf.float32)
+
+    # EXECUTE
+    iou = compute_iou_general(grtr, pred)
+    # TEST
+    iou = iou.numpy()
+    print("iou:", iou)
+    # iou has little error due to 1e-5 in "iou = inter_area / (pred_area + grtr_area - inter_area + 1e-5)"
+    assert np.isclose(iou[0, 0, 1], 1. / 7., atol=0.001)
+    assert np.isclose(iou[0, 0, 2], 1. / 5., atol=0.001)
+    assert np.isclose(iou[:, 1], 0).all()
+    assert np.isclose(iou[:, :, 0], 0).all()
+    print("!!! test_iou_general passed")
+
+
+if __name__ == "__main__":
+    test_iou_general()
+
+
 

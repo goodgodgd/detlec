@@ -6,21 +6,24 @@ from timeit import default_timer as timer
 
 from config import Config as cfg
 import utils.util_function as uf
+import model.model_util as mu
 from eval.metric import recall_precision
 
 
 class LogFile:
+    def __init__(self):
+        self.filename = op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME, "history.csv")
+
     def save_log(self, epoch, train_log, val_log):
         summary = self.merge_logs(epoch, train_log, val_log)
-        filename = op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME, "history.csv")
-        if op.isfile(filename):
-            history = pd.read_csv(filename, encoding='utf-8', converters={'epoch': lambda c: int(c)})
+        if op.isfile(self.filename):
+            history = pd.read_csv(self.filename, encoding='utf-8', converters={'epoch': lambda c: int(c)})
             history = history.append(summary, ignore_index=True)
         else:
             history = pd.DataFrame([summary])
         print("=== history\n", history)
         history["epoch"] = history["epoch"].astype(int)
-        history.to_csv(filename, encoding='utf-8', index=False, float_format='%.4f')
+        history.to_csv(self.filename, encoding='utf-8', index=False, float_format='%.4f')
 
     def merge_logs(self, epoch, train_log, val_log):
         summary = dict()
@@ -36,26 +39,27 @@ class LogFile:
 
 
 class LogData:
-    def __init__(self):
+    def __init__(self,):
         self.batch_data_table = pd.DataFrame()
         self.start = timer()
         self.summary = dict()
         self.nan_grad_count = 0
+        self.nms = mu.NonMaximumSuppression()
 
     def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
         loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
         batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
         batch_data["total_loss"] = total_loss.numpy()
+
         # check_nan must be here!
         self.check_nan(batch_data, grtr, pred)
 
-        grtr = uf.merge_and_slice_features(grtr, True)
-        pred = uf.merge_and_slice_features(pred, False)
-
-        objectness = self.analyze_objectness(grtr, pred)
+        grtr_slices = uf.merge_and_slice_features(grtr, True)
+        pred_slices = uf.merge_and_slice_features(pred, False)
+        objectness = self.analyze_objectness(grtr_slices, pred_slices)
         batch_data.update(objectness)
-        # metric = recall_precision(grtr, pred)
-        # batch_data.update(metric)
+        metric = self.calc_metrics(grtr["bboxes"], pred_slices)
+        batch_data.update(metric)
 
         batch_data = self.set_precision(batch_data, 5)
         col_order = list(batch_data.keys())
@@ -83,6 +87,20 @@ class LogData:
             neg_obj += tf.reduce_mean(neg_obj_map)
         objectness = {"pos_obj": pos_obj.numpy() / len(scales), "neg_obj": neg_obj.numpy() / len(scales)}
         return objectness
+
+    def calc_metrics(self, grtr_boxes, pred_slices):
+        scales = [key for key in pred_slices if "feature_" in key]
+        slice_keys = list(pred_slices[scales[0]].keys())    # ['bbox', 'object', 'category']
+        total_pred = {}
+        for key in slice_keys:
+            # list of (batch, HWA in scale, dim)
+            scaled_preds = [pred_slices[scale_name][key] for scale_name in scales]
+            scaled_preds = tf.concat(scaled_preds, axis=1)      # (batch, N, dim)
+            total_pred[key] = scaled_preds
+
+        pred_boxes = self.nms(total_pred)
+        result = recall_precision(grtr_boxes, pred_boxes)
+        return result
 
     def check_nan(self, losses, grtr, pred):
         valid_result = True
