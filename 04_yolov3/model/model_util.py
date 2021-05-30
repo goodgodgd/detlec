@@ -103,7 +103,7 @@ def test_nms():
     np.set_printoptions(precision=4, suppress=True, linewidth=100)
     B, N = 4, 1000
     pred = tf.random.uniform((B, N, 9), dtype=tf.float32)
-    result = non_maximum_suppression_batch(pred, 18)
+    result = NonMaximumSuppression(max_out=18)(pred)
     print(result.shape)
     print(result[0].numpy())
 

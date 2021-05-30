@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 from config import Config as cfg
 import utils.util_function as uf
 import model.model_util as mu
-from eval.metric import recall_precision
+from eval.metric import count_true_positives
 
 
 class LogFile:
@@ -99,7 +99,7 @@ class LogData:
             total_pred[key] = scaled_preds
 
         pred_boxes = self.nms(total_pred)
-        result = recall_precision(grtr_boxes, pred_boxes)
+        result = count_true_positives(grtr_boxes, pred_boxes)
         return result
 
     def check_nan(self, losses, grtr, pred):
