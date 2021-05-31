@@ -7,7 +7,7 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=0.5, per_class=False, 
     :param grtr: GT object information (batch, N, 5) / 5: yxhw, category index
     :param pred: nms result (batch, M, 8) / 8: (yxhw, category index, objectness, ctgr prob, score)
     :param num_ctgr: number of categories
-    :param iou_thresh
+    :param iou_thresh: threshold to determine whether two boxes are overlapped
     :param per_class
     :return:
     """
@@ -17,13 +17,14 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=0.5, per_class=False, 
     pred_aligned = tf.gather(pred, best_idx, batch_dims=1)              # (batch, N, 8)
     valid_iou = tf.cast(best_iou > iou_thresh, dtype=tf.float32)        # (batch, N)
     valid_grtr = tf.cast(grtr[..., 0] > 0, dtype=tf.float32)            # (batch, N) y > 0
-    valid_pred = tf.cast(pred_aligned[..., -1] > 0, dtype=tf.float32)   # (batch, N) score > 0
+    valid_pred = tf.cast(pred[..., -1] > 0, dtype=tf.float32)           # (batch, M) score > 0
     grtr_ctgr = tf.cast(grtr[..., 4], dtype=tf.int32)                   # (batch, N)
-    pred_ctgr = tf.cast(pred_aligned[..., 4], dtype=tf.int32)           # (batch, N)
-    ctgr_match = tf.cast(grtr_ctgr == pred_ctgr, dtype=tf.float32)      # (batch, N)
+    pred_ctgr = tf.cast(pred[..., 4], dtype=tf.int32)                   # (batch, M)
+    pred_ctgr_aligned = tf.cast(pred_aligned[..., 4], dtype=tf.int32)           # (batch, N)
+    ctgr_match = tf.cast(grtr_ctgr == pred_ctgr_aligned, dtype=tf.float32)      # (batch, N)
 
     grtr_onehot = tf.one_hot(grtr_ctgr, depth=num_ctgr) * valid_grtr[..., tf.newaxis]       # (batch, N, K)
-    pred_onehot = tf.one_hot(pred_ctgr, depth=num_ctgr) * valid_pred[..., tf.newaxis]       # (batch, N, K)
+    pred_onehot = tf.one_hot(pred_ctgr, depth=num_ctgr) * valid_pred[..., tf.newaxis]       # (batch, M, K)
     match_onehot = grtr_onehot * ctgr_match[..., tf.newaxis] * valid_iou[..., tf.newaxis]   # (batch, N, K)
 
     if verbose:
@@ -33,6 +34,7 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=0.5, per_class=False, 
         print("best_iou", best_iou)
         print("grtr_onehot", grtr_onehot[0])
         print("match_onehot", match_onehot[0])
+        print("valid_pred", valid_pred[0])
 
     if per_class:
         grtr_count = tf.reduce_sum(grtr_onehot, axis=1)
@@ -40,8 +42,8 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=0.5, per_class=False, 
         trpo_count = tf.reduce_sum(match_onehot, axis=1)
         return {"trpo": trpo_count, "grtr": grtr_count, "pred": pred_count}
     else:
-        grtr_count = tf.reduce_sum(grtr_onehot)
-        pred_count = tf.reduce_sum(pred_onehot)
+        grtr_count = tf.reduce_sum(valid_grtr)
+        pred_count = tf.reduce_sum(valid_pred)
         trpo_count = tf.reduce_sum(match_onehot)
         return {"trpo": trpo_count, "grtr": grtr_count, "pred": pred_count}
 
@@ -75,7 +77,7 @@ def test_count_true_positives():
         assert (tf.linalg.diag_part(iou).numpy() > 0.5).all()
 
         # create different grtr and pred boxes
-        N1 = 15
+        N1 = 20
         grtr_fn_boxes = np.tile(np.random.uniform(0, 1, (1, N1, 10)) * 0.95 + 0.05, (B, 1, 1))
         # different boxes are supposed to have low iou
         grtr_fn_boxes[..., 0] = np.linspace(0, 0.3 * (N1 - 1), N1).reshape((1, N1)) + 5.1
@@ -83,7 +85,8 @@ def test_count_true_positives():
         pred_fp_boxes = grtr_fn_boxes.copy()
         pred_fp_boxes[:, :5, :2] += 2           # zero iou
         pred_fp_boxes[:, 5:10, 4] = (pred_fp_boxes[:, 5:10, 4] + 1) % K         # different category
-        pred_fp_boxes[:, 10:15, :4] = 0         # zero box
+        pred_fp_boxes[:, 10:15, :] = 0          # zero pred box
+        grtr_fn_boxes[:, 15:20, :] = 0          # zero gt box
 
         # grtr_boxes, pred_boxes: N similar boxes, N1 different boxes
         grtr_boxes = tf.concat([grtr_tp_boxes, grtr_fn_boxes[..., :5]], axis=1)
