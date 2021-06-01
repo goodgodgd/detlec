@@ -1,5 +1,4 @@
 import sys
-import copy
 import numpy as np
 import tensorflow as tf
 
@@ -135,7 +134,7 @@ def compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):
     inter_area = inter_hw[..., 0] * inter_hw[..., 1]
     pred_area = pred_yxhw[..., 2] * pred_yxhw[..., 3]
     grtr_area = grtr_yxhw[..., 2] * grtr_yxhw[..., 3]
-    iou = inter_area / (pred_area + grtr_area - inter_area + 0.00001)
+    iou = inter_area / (pred_area + grtr_area - inter_area + 1e-5)
     return iou
 
 

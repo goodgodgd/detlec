@@ -23,7 +23,7 @@ class CiouLoss(LossBase):
         """
         # object_mask: (batch, HWA, 1), object_count: scalar
         object_mask, object_count = grtr["object"], auxi["object_count"]
-        ciou_loss = self.compute_ciou(pred["bbox"], grtr["bbox"])
+        ciou_loss = self.compute_ciou(grtr["bbox"], pred["bbox"])
         # average over object-containing grid cells
         scalar_loss = tf.reduce_sum(object_mask[..., 0] * ciou_loss) / object_count
         return scalar_loss, ciou_loss
@@ -46,12 +46,12 @@ class CiouLoss(LossBase):
         u = tf.reduce_sum(center_diff * center_diff, axis=-1)
         # NOTE: divide_no_nan results in nan gradient
         # d = tf.math.divide_no_nan(u, c)
-        d = u / (c + 1.0e-5)
+        d = u / (c + 1e-5)
 
         # grtr_hw_ratio = tf.math.divide_no_nan(grtr_yxhw[..., 2], grtr_yxhw[..., 3])
         # pred_hw_ratio = tf.math.divide_no_nan(pred_yxhw[..., 2], pred_yxhw[..., 3])
-        grtr_hw_ratio = grtr_yxhw[..., 2] / (grtr_yxhw[..., 3] + 1.0e-5)
-        pred_hw_ratio = pred_yxhw[..., 2] / (pred_yxhw[..., 3] + 1.0e-5)
+        grtr_hw_ratio = grtr_yxhw[..., 3] / (grtr_yxhw[..., 2] + 1e-5)
+        pred_hw_ratio = pred_yxhw[..., 3] / (pred_yxhw[..., 2] + 1e-5)
         coeff = tf.convert_to_tensor(4.0 / (np.pi * np.pi), dtype=tf.float32)
         v = coeff * tf.pow((tf.atan(grtr_hw_ratio) - tf.atan(pred_hw_ratio)), 2)
         alpha = v / (1 - iou + v)
