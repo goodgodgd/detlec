@@ -133,7 +133,13 @@ class LogData:
         return new_logs
 
     def finalize(self):
-        self.summary = self.batch_data_table.mean(axis=0).to_dict()
+        mean_result = self.batch_data_table.mean(axis=0).to_dict()
+        sum_result = self.batch_data_table.sum(axis=0).to_dict()
+        sum_result = {"recall": sum_result["trpo"] / (sum_result["grtr"] + 1e-5),
+                      "precision": sum_result["trpo"] / (sum_result["pred"] + 1e-5)}
+        metric_keys = ["trpo", "grtr", "pred"]
+        self.summary = {key: val for key, val in mean_result.items() if key not in metric_keys}
+        self.summary.update(sum_result)
         self.summary["time_m"] = round((timer() - self.start)/60., 5)
         print("finalize:", self.summary)
     
