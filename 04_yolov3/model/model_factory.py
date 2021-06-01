@@ -3,7 +3,7 @@ import model.backbone as back
 import model.head as head
 import utils.util_function as uf
 
-from config import Config as cfg
+import config as cfg
 import model.model_util as mu
 
 

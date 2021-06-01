@@ -36,8 +36,8 @@ class TrainValBase:
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
                               f"time={timer() - start:.3f}, "
                               f"loss={total_loss:.3f}, ")
-            # if step > 20:
-            #     break
+            if step > 20:
+                break
 
         print("")
         logger.finalize()

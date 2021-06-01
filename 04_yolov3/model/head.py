@@ -137,7 +137,7 @@ class FeatureDecoder:
 
 
 # ==================================================
-from config import Config as cfg
+import config as cfg
 
 
 def test_feature_decoder():

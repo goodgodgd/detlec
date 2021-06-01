@@ -12,7 +12,7 @@ import utils.util_class as uc
 import utils.util_function as uf
 from tfrecord.example_maker import ExampleMaker
 import tfrecord.tfr_util as tu
-from config import Config as cfg
+import config as cfg
 
 
 def drive_manager_factory(dataset_name, split, srcpath):

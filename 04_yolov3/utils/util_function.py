@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import tensorflow as tf
 
-from config import Config as cfg
+import config as cfg
 
 
 def set_gpu_configs():
@@ -99,7 +99,7 @@ def slice_feature(feature, is_gt):
     :param is_gt: is ground truth feature map?
     :return: sliced feature maps
     """
-    channel_composition = cfg.Model.Output.GRTR_CHANNEL_COMPOSITION if is_gt else cfg.Model.Output.PRED_CHANNEL_COMPOSITION
+    channel_composition = cfg.Model.Output.get_channel_composition(is_gt)
     names = [name for name, chan in channel_composition.items()]            # ['bbox', 'object', 'category', ...]
     channels = [chan for name, chan in channel_composition.items()]         # [4, 1, 4, ...]
     slices = tf.split(feature, channels, axis=-1)

@@ -4,7 +4,7 @@ import tensorflow as tf
 import cv2
 
 import settings
-from config import Config as cfg
+import config as cfg
 import utils.util_function as uf
 
 

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 import settings
-from config import Config as cfg
+import config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
 from model.model_factory import ModelFactory
 from train.loss_factory import IntegratedLoss

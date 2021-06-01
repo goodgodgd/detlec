@@ -3,7 +3,7 @@ import cv2
 
 import tfrecord.tfr_util as tu
 import tfrecord.preprocess as pr
-from config import Config as cfg
+import config as cfg
 
 
 class ExampleMaker:

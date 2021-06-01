@@ -4,7 +4,7 @@ import tensorflow as tf
 import pandas as pd
 from timeit import default_timer as timer
 
-from config import Config as cfg
+import config as cfg
 import utils.util_function as uf
 import model.model_util as mu
 from eval.metric import count_true_positives
@@ -39,7 +39,7 @@ class LogFile:
 
 
 class LogData:
-    def __init__(self,):
+    def __init__(self):
         self.batch_data_table = pd.DataFrame()
         self.start = timer()
         self.summary = dict()
@@ -92,14 +92,16 @@ class LogData:
         scales = [key for key in pred_slices if "feature_" in key]
         slice_keys = list(pred_slices[scales[0]].keys())    # ['bbox', 'object', 'category']
         total_pred = {}
+        # merge pred features over scales
         for key in slice_keys:
             # list of (batch, HWA in scale, dim)
             scaled_preds = [pred_slices[scale_name][key] for scale_name in scales]
             scaled_preds = tf.concat(scaled_preds, axis=1)      # (batch, N, dim)
             total_pred[key] = scaled_preds
 
+        num_ctgr = total_pred["category"].shape[-1]
         pred_boxes = self.nms(total_pred)
-        result = count_true_positives(grtr_boxes, pred_boxes)
+        result = count_true_positives(grtr_boxes, pred_boxes, num_ctgr)
         return result
 
     def check_nan(self, losses, grtr, pred):

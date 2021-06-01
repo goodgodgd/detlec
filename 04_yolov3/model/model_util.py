@@ -4,7 +4,7 @@ import tensorflow_addons as tfa
 import utils.util_function as uf
 import numpy as np
 
-from config import Config as cfg
+import config as cfg
 
 
 class CustomConv2D:
@@ -57,7 +57,6 @@ class NonMaximumSuppression:
         :param pred: merged predictions, dict of (batch, N, dim), N: sum of HWAs over scales(l,m,s)
         :return:
         """
-        pred = uf.slice_feature(pred, False)
         boxes = uf.convert_box_format_yxhw_to_tlbr(pred["bbox"])    # (batch, N, 4)
         categories = tf.argmax(pred["category"], axis=-1)           # (batch, N)
         best_probs = tf.reduce_max(pred["category"], axis=-1)       # (batch, N)
