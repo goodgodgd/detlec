@@ -1,4 +1,3 @@
-import os.path as op
 import numpy as np
 import tensorflow as tf
 import pandas as pd
@@ -6,55 +5,19 @@ from timeit import default_timer as timer
 
 import utils.util_function as uf
 import model.model_util as mu
-from eval.metric import count_true_positives
+from train.logging.metric import count_true_positives
 
 
-class LogFile:
-    def __init__(self, filename):
-        self.filename = filename
-
-    def save_log(self, epoch, train_log, val_log):
-        summary = self.merge_logs(epoch, train_log, val_log)
-        if op.isfile(self.filename):
-            history = pd.read_csv(self.filename, encoding='utf-8', converters={'epoch': lambda c: int(c)})
-            history = history.append(summary, ignore_index=True)
-        else:
-            history = pd.DataFrame([summary])
-        print("=== history\n", history)
-        history["epoch"] = history["epoch"].astype(int)
-        history.to_csv(self.filename, encoding='utf-8', index=False, float_format='%.4f')
-
-    def merge_logs(self, epoch, train_log, val_log):
-        summary = dict()
-        summary["epoch"] = epoch
-        train_summary = train_log.get_summary()
-        train_summary = {"!" + key: val for key, val in train_summary.items()}
-        summary.update(train_summary)
-        summary["|"] = 0
-        val_summary = val_log.get_summary()
-        val_summary = {"`" + key: val for key, val in val_summary.items()}
-        summary.update(val_summary)
-        return summary
-
-
-class TrainLog:
+class HistoryLog:
     def __init__(self):
         self.batch_data_table = pd.DataFrame()
         self.start = timer()
-        self.summary = dict()
-        self.nan_grad_count = 0
         self.nms = mu.NonMaximumSuppression()
 
-    def log_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
-        self.default_log(step, grtr, pred, total_loss, loss_by_type)
-
-    def default_log(self, step, grtr, pred, total_loss, loss_by_type):
+    def __call__(self, step, grtr, pred, total_loss, loss_by_type):
         loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
         batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
         batch_data["total_loss"] = total_loss.numpy()
-
-        # check_nan must be here!
-        self.check_nan(batch_data, grtr, pred)
 
         grtr_slices = uf.merge_and_slice_features(grtr, True)
         pred_slices = uf.merge_and_slice_features(pred, False)
@@ -106,23 +69,6 @@ class TrainLog:
         result = count_true_positives(grtr_boxes, pred_boxes, num_ctgr)
         return result
 
-    def check_nan(self, losses, grtr, pred):
-        valid_result = True
-        for name, loss in losses.items():
-            if np.isnan(loss) or np.isinf(loss) or loss > 100:
-                print(f"nan loss: {name}, {loss}")
-                valid_result = False
-        for name, tensor in pred.items():
-            if not np.isfinite(tensor.numpy()).all():
-                print(f"nan pred:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
-                valid_result = False
-        for name, tensor in grtr.items():
-            if not np.isfinite(tensor.numpy()).all():
-                print(f"nan grtr:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
-                valid_result = False
-
-        assert valid_result
-
     def check_pred_scales(self, pred):
         raw_features = {key: tensor for key, tensor in pred.items() if key.endswith("raw")}
         pred_scales = dict()
@@ -134,26 +80,14 @@ class TrainLog:
         new_logs = {key: np.around(val, precision) for key, val in logs.items()}
         return new_logs
 
-    def finalize(self):
+    def make_summary(self):
         mean_result = self.batch_data_table.mean(axis=0).to_dict()
         sum_result = self.batch_data_table.sum(axis=0).to_dict()
         sum_result = {"recall": sum_result["trpo"] / (sum_result["grtr"] + 1e-5),
                       "precision": sum_result["trpo"] / (sum_result["pred"] + 1e-5)}
         metric_keys = ["trpo", "grtr", "pred"]
-        self.summary = {key: val for key, val in mean_result.items() if key not in metric_keys}
-        self.summary.update(sum_result)
-        self.summary["time_m"] = round((timer() - self.start)/60., 5)
-        print("finalize:", self.summary)
-    
-    def get_summary(self):
-        return self.summary
-
-
-class ValidationLog(TrainLog):
-    def __init__(self):
-        super().__init__()
-
-    def log_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
-        self.default_log(step, grtr, pred, total_loss, loss_by_type)
-        self.visual_log()
-
+        summary = {key: val for key, val in mean_result.items() if key not in metric_keys}
+        summary.update(sum_result)
+        summary["time_m"] = round((timer() - self.start ) /60., 5)
+        print("epoch summary:", summary)
+        return summary

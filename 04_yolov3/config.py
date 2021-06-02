@@ -74,12 +74,17 @@ class Train:
     MODE = ["eager", "graph"][1]
     BATCH_SIZE = 2
     TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
+    DETAIL_LOG_EPOCHS = list(range(0, 100, 5))
 
 
 class NMS:
     MAX_OUT = 20
     IOU_THRESH = 0.5
     SCORE_THRESH = 0.5
+
+
+class Validation:
+    VAL_EPOCH = "latest"
 
 
 def summary():

@@ -2,7 +2,7 @@ import tensorflow as tf
 from timeit import default_timer as timer
 
 import utils.util_function as uf
-from train.logger import TrainLog
+from train.logging.logger import Logger
 
 
 def trainer_factory(mode, model, loss_object, optimizer, steps):
@@ -25,10 +25,9 @@ class TrainValBase:
         self.loss_object = loss_object
         self.optimizer = optimizer
         self.epoch_steps = epoch_steps
-        self.logger_type = TrainLog
 
-    def run_epoch(self, dataset):
-        logger = self.logger_type()
+    def run_epoch(self, dataset, detail_log):
+        logger = Logger(detail_log, detail_log)
         for step, features in enumerate(dataset):
             start = timer()
             prediction, total_loss, loss_by_type = self.run_batch(features)
@@ -40,7 +39,6 @@ class TrainValBase:
                 break
 
         print("")
-        logger.finalize()
         return logger
 
     def run_batch(self, features):
@@ -50,8 +48,7 @@ class TrainValBase:
 class ModelEagerTrainer(TrainValBase):
     def __init__(self, model, loss_object, optimizer, epoch_steps=0):
         super().__init__(model, loss_object, optimizer, epoch_steps)
-        self.logger_type = TrainLog
-    
+
     def run_batch(self, features):
         return self.train_step(features)
 
@@ -77,7 +74,6 @@ class ModelGraphTrainer(ModelEagerTrainer):
 class ModelEagerValidater(TrainValBase):
     def __init__(self, model, loss_object, epoch_steps=0):
         super().__init__(model, loss_object, None, epoch_steps)
-        self.logger_type = TrainLog
 
     def run_batch(self, features):
         return self.validate_step(features)

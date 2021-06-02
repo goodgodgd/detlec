@@ -14,43 +14,38 @@ import train.train_val as tv
 import utils.util_function as uf
 
 
-def train_main():
+def validate_main():
     uf.set_gpu_configs()
-    end_epoch = 0
+    ckpt_path = op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
+    latest_epoch = read_previous_epoch(ckpt_path)
+    val_epoch = cfg.Validation.VAL_EPOCH
+    weight_suffix = val_epoch if isinstance(val_epoch, str) else f"ep{val_epoch:02d}"
+    target_epoch = latest_epoch if isinstance(val_epoch, str) else val_epoch
+    start_epoch = 0
+
     for dataset_name, epochs, learning_rate, loss_weights, model_save in cfg.Train.TRAINING_PLAN:
-        end_epoch += epochs
-        train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_save)
+        if start_epoch <= target_epoch < start_epoch + epochs:
+            analyze_performance(dataset_name, loss_weights, weight_suffix)
 
 
-def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_save):
+def analyze_performance(dataset_name, loss_weights, weight_suffix):
     batch_size, train_mode = cfg.Train.BATCH_SIZE, cfg.Train.MODE
     tfrd_path, ckpt_path = cfg.Paths.TFRECORD, op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
     valid_category = cfg.get_valid_category_mask(dataset_name)
-    start_epoch = read_previous_epoch(ckpt_path)
-    if end_epoch <= start_epoch:
-        print(f"!! end_epoch {end_epoch} <= start_epoch {start_epoch}, no need to train")
-        return
 
-    dataset_train, train_steps, imshape, anchors_per_scale = \
-        get_dataset(tfrd_path, dataset_name, False, batch_size, "train")
-    dataset_val, val_steps, _, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
+    dataset_val, val_steps, imshape, anchors_per_scale \
+        = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
 
-    model, loss_object, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
-                                                          learning_rate, loss_weights, valid_category)
-    trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
+    model = ModelFactory(batch_size, imshape, anchors_per_scale).get_model()
+    model = try_load_weights(ckpt_path, model, weight_suffix)
+    loss_object = IntegratedLoss(loss_weights, valid_category)
+
     validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
     log_file = LogFile(ckpt_path)
 
-    for epoch in range(start_epoch, end_epoch):
-        print(f"========== Start dataset : {dataset_name} epoch: {epoch + 1}/{end_epoch} ==========")
-        detail_log = (epoch in cfg.Train.DETAIL_LOG_EPOCHS)
-        train_result = trainer.run_epoch(dataset_train)
-        val_result = validater.run_epoch(dataset_val, detail_log)
-        save_model_ckpt(ckpt_path, model)
-        log_file.save_log(epoch, train_result, val_result)
-
-    if model_save:
-        save_model_ckpt(ckpt_path, model, f"ep{end_epoch:02d}")
+    print(f"========== Start analyze_performance with {dataset_name} epoch: {weight_suffix} ==========")
+    val_result = validater.run_epoch(dataset_val, True)
+    log_file.save_val_log(val_result)
 
 
 def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
@@ -66,23 +61,6 @@ def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
     print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, "
           f"frames={frames},\n\tanchors={anchors_per_scale}")
     return dataset, frames // batch_size, image_shape, anchors_per_scale
-
-
-def create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path, learning_rate,
-                          loss_weights, valid_category, weight_suffix='latest'):
-    model = ModelFactory(batch_size, imshape, anchors_per_scale).get_model()
-    model = try_load_weights(ckpt_path, model, weight_suffix)
-    loss_object = IntegratedLoss(loss_weights, valid_category)
-    optimizer = tf.optimizers.Adam(lr=learning_rate)
-    return model, loss_object, optimizer
-
-
-def save_model_ckpt(ckpt_path, model, weights_suffix='latest'):
-    ckpt_file = op.join(ckpt_path, f"model_{weights_suffix}.h5")
-    if not op.isdir(ckpt_path):
-        os.makedirs(ckpt_path, exist_ok=True)
-    print("=== save model:", ckpt_file)
-    model.save_weights(ckpt_file)
 
 
 def try_load_weights(ckpt_path, model, weights_suffix='latest'):
@@ -115,4 +93,4 @@ def read_previous_epoch(ckpt_path):
 
 if __name__ == "__main__":
     np.set_printoptions(precision=4, suppress=True, linewidth=100)
-    train_main()
+    validate_main()
