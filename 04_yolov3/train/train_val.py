@@ -1,9 +1,8 @@
 import tensorflow as tf
-import numpy as np
 from timeit import default_timer as timer
 
 import utils.util_function as uf
-from train.logger import LogData
+from train.logger import TrainLog
 
 
 def trainer_factory(mode, model, loss_object, optimizer, steps):
@@ -26,13 +25,14 @@ class TrainValBase:
         self.loss_object = loss_object
         self.optimizer = optimizer
         self.epoch_steps = epoch_steps
+        self.logger_type = TrainLog
 
     def run_epoch(self, dataset):
-        logger = LogData()
+        logger = self.logger_type()
         for step, features in enumerate(dataset):
             start = timer()
             prediction, total_loss, loss_by_type = self.run_batch(features)
-            logger.append_batch_result(step, features, prediction, total_loss, loss_by_type)
+            logger.log_batch_result(step, features, prediction, total_loss, loss_by_type)
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
                               f"time={timer() - start:.3f}, "
                               f"loss={total_loss:.3f}, ")
@@ -50,6 +50,7 @@ class TrainValBase:
 class ModelEagerTrainer(TrainValBase):
     def __init__(self, model, loss_object, optimizer, epoch_steps=0):
         super().__init__(model, loss_object, optimizer, epoch_steps)
+        self.logger_type = TrainLog
     
     def run_batch(self, features):
         return self.train_step(features)
@@ -76,6 +77,7 @@ class ModelGraphTrainer(ModelEagerTrainer):
 class ModelEagerValidater(TrainValBase):
     def __init__(self, model, loss_object, epoch_steps=0):
         super().__init__(model, loss_object, None, epoch_steps)
+        self.logger_type = TrainLog
 
     def run_batch(self, features):
         return self.validate_step(features)

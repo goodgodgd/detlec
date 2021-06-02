@@ -39,7 +39,7 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
                                                           learning_rate, loss_weights, valid_category)
     trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
     validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
-    log_file = LogFile()
+    log_file = LogFile(op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME, "history.csv"))
 
     for epoch in range(start_epoch, end_epoch):
         print(f"========== Start dataset : {dataset_name} epoch: {epoch + 1}/{end_epoch} ==========")

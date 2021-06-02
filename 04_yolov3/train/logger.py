@@ -4,15 +4,14 @@ import tensorflow as tf
 import pandas as pd
 from timeit import default_timer as timer
 
-import config as cfg
 import utils.util_function as uf
 import model.model_util as mu
 from eval.metric import count_true_positives
 
 
 class LogFile:
-    def __init__(self):
-        self.filename = op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME, "history.csv")
+    def __init__(self, filename):
+        self.filename = filename
 
     def save_log(self, epoch, train_log, val_log):
         summary = self.merge_logs(epoch, train_log, val_log)
@@ -38,7 +37,7 @@ class LogFile:
         return summary
 
 
-class LogData:
+class TrainLog:
     def __init__(self):
         self.batch_data_table = pd.DataFrame()
         self.start = timer()
@@ -46,7 +45,10 @@ class LogData:
         self.nan_grad_count = 0
         self.nms = mu.NonMaximumSuppression()
 
-    def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
+    def log_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
+        self.default_log(step, grtr, pred, total_loss, loss_by_type)
+
+    def default_log(self, step, grtr, pred, total_loss, loss_by_type):
         loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
         batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
         batch_data["total_loss"] = total_loss.numpy()
@@ -145,3 +147,13 @@ class LogData:
     
     def get_summary(self):
         return self.summary
+
+
+class ValidationLog(TrainLog):
+    def __init__(self):
+        super().__init__()
+
+    def log_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
+        self.default_log(step, grtr, pred, total_loss, loss_by_type)
+        self.visual_log()
+
