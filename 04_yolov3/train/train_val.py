@@ -26,7 +26,7 @@ class TrainValBase:
         self.optimizer = optimizer
         self.epoch_steps = epoch_steps
 
-    def run_epoch(self, dataset, detail_log):
+    def run_epoch(self, dataset, detail_log=False):
         logger = Logger(detail_log, detail_log)
         for step, features in enumerate(dataset):
             start = timer()
@@ -35,8 +35,8 @@ class TrainValBase:
             uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
                               f"time={timer() - start:.3f}, "
                               f"loss={total_loss:.3f}, ")
-            if step > 20:
-                break
+            # if step > 20:
+            #     break
 
         print("")
         return logger

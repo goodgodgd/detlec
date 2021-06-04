@@ -52,11 +52,27 @@ class NonMaximumSuppression:
         self.score_thresh = score_thresh
 
     @tf.function
-    def __call__(self, pred):
+    def __call__(self, pred, merged=False):
         """
-        :param pred: merged predictions, dict of (batch, N, dim), N: sum of HWAs over scales(l,m,s)
+        :param pred: if merged True, dict of prediction slices merged over scales,
+                        {'bbox': (batch, sum of Nx, 4), 'object': ..., 'category': ...}
+                     if merged False, dict of prediction slices for each scale,
+                        {'feature_l': {'bbox': (batch, Nl, 4), 'object': ..., 'category': ...}}
+        :param merged
         :return:
         """
+        if merged is False:
+            scales = [key for key in pred if "feature_" in key]
+            slice_keys = list(pred[scales[0]].keys())    # ['bbox', 'object', 'category']
+            merged_pred = {}
+            # merge pred features over scales
+            for key in slice_keys:
+                # list of (batch, HWA in scale, dim)
+                scaled_preds = [pred[scale_name][key] for scale_name in scales]
+                scaled_preds = tf.concat(scaled_preds, axis=1)      # (batch, N, dim)
+                merged_pred[key] = scaled_preds
+            pred = merged_pred
+
         boxes = uf.convert_box_format_yxhw_to_tlbr(pred["bbox"])    # (batch, N, 4)
         categories = tf.argmax(pred["category"], axis=-1)           # (batch, N)
         best_probs = tf.reduce_max(pred["category"], axis=-1)       # (batch, N)
@@ -101,8 +117,20 @@ class NonMaximumSuppression:
 def test_nms():
     np.set_printoptions(precision=4, suppress=True, linewidth=100)
     B, N = 4, 1000
-    pred = tf.random.uniform((B, N, 9), dtype=tf.float32)
-    result = NonMaximumSuppression(max_out=18)(pred)
+    pred = {"feature_l": {"bbox": tf.random.uniform((B, N, 4), dtype=tf.float32),
+                          "object": tf.random.uniform((B, N, 1), dtype=tf.float32),
+                          "category": tf.random.uniform((B, N, 4), dtype=tf.float32),
+                          },
+            "feature_m": {"bbox": tf.random.uniform((B, N, 4), dtype=tf.float32),
+                          "object": tf.random.uniform((B, N, 1), dtype=tf.float32),
+                          "category": tf.random.uniform((B, N, 4), dtype=tf.float32),
+                          },
+            "feature_s": {"bbox": tf.random.uniform((B, N, 4), dtype=tf.float32),
+                          "object": tf.random.uniform((B, N, 1), dtype=tf.float32),
+                          "category": tf.random.uniform((B, N, 4), dtype=tf.float32),
+                          }
+            }
+    result = NonMaximumSuppression(max_out=18)(pred, False)
     print(result.shape)
     print(result[0].numpy())
 

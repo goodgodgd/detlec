@@ -3,6 +3,8 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 
+import utils.util_function as uf
+import model.model_util as mu
 from train.logging.history_log import HistoryLog
 from train.logging.visual_log import VisualLog
 from train.logging.anchor_log import AnchorLog
@@ -44,14 +46,19 @@ class Logger:
         self.history_logger = HistoryLog()
         self.visual_logger = VisualLog() if visual_log else None
         self.anchor_logger = AnchorLog() if anchor_log else None
+        self.nms = mu.NonMaximumSuppression()
 
     def log_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
         self.check_nan(grtr, pred, loss_by_type)
-        self.history_logger(step, grtr, pred, total_loss, loss_by_type)
+        grtr_slices = uf.merge_and_slice_features(grtr, True)
+        pred_slices = uf.merge_and_slice_features(pred, False)
+        pred_slices["nms"] = self.nms(pred_slices)
+
+        self.history_logger(step, grtr_slices, pred_slices, total_loss, loss_by_type)
         if self.visual_logger:
-            self.visual_logger(step, grtr, pred)
+            self.visual_logger(step, grtr_slices, pred_slices)
         if self.anchor_logger:
-            self.anchor_logger(step, grtr, pred, loss_by_type)
+            self.anchor_logger(step, pred_slices, pred_slices, loss_by_type)
 
     def get_summary(self):
         return self.history_logger.make_summary()

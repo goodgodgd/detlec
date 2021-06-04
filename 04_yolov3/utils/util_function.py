@@ -83,13 +83,16 @@ def merge_and_slice_features(features, is_gt):
     :return: sliced feature maps in each scale
     """
     scales = [key for key in features if "feature" in key]  # ['feature_l', 'feature_m', 'feature_s']
-    new_features = {}
+    sliced_features = {}
     for key in scales:
         raw_feat = features[key]
         merged_feat = merge_dim_hwa(raw_feat)
         slices = slice_feature(merged_feat, is_gt)
-        new_features[key] = slices
-    return new_features
+        sliced_features[key] = slices
+
+    other_features = {key: val for key, val in features.items() if key not in scales}
+    sliced_features.update(other_features)
+    return sliced_features
 
 
 def slice_feature(feature, is_gt):
