@@ -38,14 +38,14 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
     model, loss_object, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
                                                           learning_rate, loss_weights, valid_category)
     trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
-    validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
+    validater = tv.validater_factory(train_mode, model, loss_object, val_steps, ckpt_path)
     log_file = LogFile(ckpt_path)
 
     for epoch in range(start_epoch, end_epoch):
         print(f"========== Start dataset : {dataset_name} epoch: {epoch + 1}/{end_epoch} ==========")
         detail_log = (epoch in cfg.Train.DETAIL_LOG_EPOCHS)
         train_result = trainer.run_epoch(dataset_train)
-        val_result = validater.run_epoch(dataset_val, detail_log)
+        val_result = validater.run_epoch(dataset_val, epoch, detail_log)
         save_model_ckpt(ckpt_path, model)
         log_file.save_log(epoch, train_result, val_result)
 

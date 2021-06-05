@@ -12,22 +12,23 @@ def trainer_factory(mode, model, loss_object, optimizer, steps):
         return ModelGraphTrainer(model, loss_object, optimizer, steps)
 
 
-def validater_factory(mode, model, loss_object, steps):
+def validater_factory(mode, model, loss_object, steps, ckpt_path):
     if mode == "eager":
-        return ModelEagerValidater(model, loss_object, steps)
+        return ModelEagerValidater(model, loss_object, steps, ckpt_path)
     elif mode == "graph":
-        return ModelGraphValidater(model, loss_object, steps)
+        return ModelGraphValidater(model, loss_object, steps, ckpt_path)
 
 
 class TrainValBase:
-    def __init__(self, model, loss_object, optimizer, epoch_steps):
+    def __init__(self, model, loss_object, optimizer, epoch_steps, ckpt_path):
         self.model = model
         self.loss_object = loss_object
         self.optimizer = optimizer
         self.epoch_steps = epoch_steps
+        self.ckpt_path = ckpt_path
 
-    def run_epoch(self, dataset, detail_log=False):
-        logger = Logger(detail_log, detail_log)
+    def run_epoch(self, dataset, epoch=0, detail_log=False):
+        logger = Logger(detail_log, detail_log, epoch, self.ckpt_path)
         for step, features in enumerate(dataset):
             start = timer()
             prediction, total_loss, loss_by_type = self.run_batch(features)
@@ -39,6 +40,7 @@ class TrainValBase:
             #     break
 
         print("")
+        logger.finalize()
         return logger
 
     def run_batch(self, features):
@@ -46,8 +48,8 @@ class TrainValBase:
 
 
 class ModelEagerTrainer(TrainValBase):
-    def __init__(self, model, loss_object, optimizer, epoch_steps=0):
-        super().__init__(model, loss_object, optimizer, epoch_steps)
+    def __init__(self, model, loss_object, optimizer, epoch_steps, ckpt_path=None):
+        super().__init__(model, loss_object, optimizer, epoch_steps, ckpt_path)
 
     def run_batch(self, features):
         return self.train_step(features)
@@ -63,8 +65,8 @@ class ModelEagerTrainer(TrainValBase):
 
 
 class ModelGraphTrainer(ModelEagerTrainer):
-    def __init__(self, model, loss_object, optimizer, epoch_steps=0):
-        super().__init__(model, loss_object, optimizer, epoch_steps)
+    def __init__(self, model, loss_object, optimizer, epoch_steps, ckpt_path=None):
+        super().__init__(model, loss_object, optimizer, epoch_steps, ckpt_path)
     
     @tf.function
     def run_batch(self, features):
@@ -72,8 +74,8 @@ class ModelGraphTrainer(ModelEagerTrainer):
 
 
 class ModelEagerValidater(TrainValBase):
-    def __init__(self, model, loss_object, epoch_steps=0):
-        super().__init__(model, loss_object, None, epoch_steps)
+    def __init__(self, model, loss_object, epoch_steps, ckpt_path):
+        super().__init__(model, loss_object, None, epoch_steps, ckpt_path)
 
     def run_batch(self, features):
         return self.validate_step(features)
@@ -85,8 +87,8 @@ class ModelEagerValidater(TrainValBase):
 
 
 class ModelGraphValidater(ModelEagerValidater):
-    def __init__(self, model, loss_object, epoch_steps=0):
-        super().__init__(model, loss_object, epoch_steps)
+    def __init__(self, model, loss_object, epoch_steps, ckpt_path):
+        super().__init__(model, loss_object, epoch_steps, ckpt_path)
 
     @tf.function
     def run_batch(self, features):

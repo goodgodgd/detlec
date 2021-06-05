@@ -59,7 +59,7 @@ class NonMaximumSuppression:
                      if merged False, dict of prediction slices for each scale,
                         {'feature_l': {'bbox': (batch, Nl, 4), 'object': ..., 'category': ...}}
         :param merged
-        :return:
+        :return: (batch, max_out, 8), 8: bbox, category, objectness, ctgr_prob, score
         """
         if merged is False:
             scales = [key for key in pred if "feature_" in key]

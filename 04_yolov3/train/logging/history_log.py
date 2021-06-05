@@ -10,8 +10,16 @@ class HistoryLog:
     def __init__(self):
         self.batch_data_table = pd.DataFrame()
         self.start = timer()
+        self.summary = dict()
 
     def __call__(self, step, grtr, pred, total_loss, loss_by_type):
+        """
+        :param step: integer step index
+        :param grtr: slices of GT data {'image': (B,H,W,3), 'bboxes': (B,N,6), 'feature_l': {'bbox': (B,HWA,4), ...}, ...}
+        :param pred: slices of pred. data {'nms': (B,M,8), 'feature_l': {'bbox': (B,HWA,4), ...}, ...}
+        :param total_loss:
+        :param loss_by_type:
+        """
         loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
         batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
         batch_data["total_loss"] = total_loss.numpy()
@@ -71,4 +79,7 @@ class HistoryLog:
         summary.update(sum_result)
         summary["time_m"] = round((timer() - self.start ) /60., 5)
         print("epoch summary:", summary)
-        return summary
+        self.summary = summary
+
+    def get_summary(self):
+        return self.summary

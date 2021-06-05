@@ -42,10 +42,10 @@ class LogFile:
 
 
 class Logger:
-    def __init__(self, visual_log, anchor_log):
+    def __init__(self, visual_log, anchor_log, ckpt_path, epoch):
         self.history_logger = HistoryLog()
-        self.visual_logger = VisualLog() if visual_log else None
-        self.anchor_logger = AnchorLog() if anchor_log else None
+        self.visual_logger = VisualLog(ckpt_path, epoch) if visual_log else None
+        self.anchor_logger = AnchorLog(ckpt_path, epoch) if anchor_log else None
         self.nms = mu.NonMaximumSuppression()
 
     def log_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
@@ -60,8 +60,11 @@ class Logger:
         if self.anchor_logger:
             self.anchor_logger(step, pred_slices, pred_slices, loss_by_type)
 
+    def finalize(self):
+        self.history_logger.make_summary()
+
     def get_summary(self):
-        return self.history_logger.make_summary()
+        return self.history_logger.get_summary()
 
     def get_anchor_log(self):
         if self.anchor_logger:
