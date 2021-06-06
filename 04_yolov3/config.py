@@ -54,6 +54,8 @@ class Model:
         GRTR_CHANNEL_COMPOSITION = {'bbox': 4, 'object': 1, 'category': 1}
         PRED_CHANNEL_COMPOSITION = {'bbox': 4, 'object': 1, 'category': len(Tfrdata.CATEGORY_NAMES)}
         FEATURE_CHANNELS = sum([val for key, val in PRED_CHANNEL_COMPOSITION.items()])
+        GRTR_BBOX_COMPOSITION = {'yxhw': 4, 'category': 1}
+        PRED_BBOX_COMPOSITION = {'yxhw': 4, 'category': 1, 'object': 1, 'ctgr_prob': 1, 'score': 1}
 
         @classmethod
         def get_channel_composition(cls, is_gt: bool):
@@ -61,6 +63,13 @@ class Model:
                 return cls.GRTR_CHANNEL_COMPOSITION
             else:
                 return cls.PRED_CHANNEL_COMPOSITION
+
+        @classmethod
+        def get_bbox_composition(cls, is_gt: bool):
+            if is_gt:
+                return cls.GRTR_BBOX_COMPOSITION
+            else:
+                return cls.PRED_BBOX_COMPOSITION
 
     class Structure:
         BACKBONE = "Darknet53"

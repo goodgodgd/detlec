@@ -4,8 +4,8 @@ import utils.util_function as uf
 
 def count_true_positives(grtr, pred, num_ctgr, iou_thresh=0.5, per_class=False):
     """
-    :param grtr: GT object information (batch, N, 5) / 5: yxhw, category index
-    :param pred: nms result (batch, M, 8) / 8: (yxhw, category index, objectness, ctgr prob, score)
+    :param grtr: slices of GT object info {'yxhw': (batch, N, 4), 'category': (batch, N)}
+    :param pred: slices of nms result {'yxhw': (batch, M, 4), 'category': (batch, M), ...}
     :param num_ctgr: number of categories
     :param iou_thresh: threshold to determine whether two boxes are overlapped
     :param per_class
@@ -13,9 +13,9 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=0.5, per_class=False):
     """
     splits = split_true_false(grtr, pred, iou_thresh)
 
-    valid_grtr = tf.cast(grtr[..., 0] > 0, dtype=tf.float32)            # (batch, N) y > 0
-    valid_pred = tf.cast(pred[..., -1] > 0, dtype=tf.float32)           # (batch, M) score > 0
-    valid_trpo = tf.cast(splits["grtr_tp"][..., 0] > 0, dtype=tf.float32)   # (batch, M) y > 0
+    valid_grtr = tf.cast(grtr["yxhw"][..., 0] > 0, dtype=tf.float32)        # (batch, N) y > 0
+    valid_pred = tf.cast(pred["score"][..., 0] > 0, dtype=tf.float32)       # (batch, M) score > 0
+    valid_trpo = tf.cast(splits["grtr_tp"]["yxhw"][..., 0] > 0, dtype=tf.float32)   # (batch, M) y > 0
 
     if per_class:
         grtr_count = count_per_class(grtr, valid_grtr, num_ctgr)
@@ -31,45 +31,42 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=0.5, per_class=False):
 
 def split_true_false(grtr, pred, iou_thresh=0.5):
     """
-    :param grtr: GT object information in tf.Tensor (batch, N, 5) / 5: yxhw, category index
-    :param pred: nms result in tf.Tensor (batch, M, 8) / 8: (yxhw, category index, objectness, ctgr prob, score)
+    :param grtr: slices of GT object info {'yxhw': (batch, N, 4), 'category': (batch, N)}
+    :param pred: slices of nms result {'yxhw': (batch, M, 4), 'category': (batch, M), ...}
     :param iou_thresh: threshold to determine whether two boxes are overlapped
     :return:
     """
-    grtr_ctgr = tf.cast(grtr[..., 4], dtype=tf.int32)                   # (batch, N)
-    iou = uf.compute_iou_general(grtr, pred)                            # (batch, N, M)
-    best_iou = tf.reduce_max(iou, axis=-1)                              # (batch, N)
-    iou_match = tf.cast(best_iou > iou_thresh, dtype=tf.float32)        # (batch, N)
-    best_idx = tf.cast(tf.argmax(iou, axis=-1), dtype=tf.int32)         # (batch, N)
-    pred_aligned = tf.gather(pred, best_idx, batch_dims=1)              # (batch, N, 8)
-    pred_ctgr_aligned = tf.cast(pred_aligned[..., 4], dtype=tf.int32)   # (batch, N)
+    grtr_ctgr = tf.cast(grtr["category"][..., 0], dtype=tf.int32)           # (batch, N)
+    iou = uf.compute_iou_general(grtr["yxhw"], pred["yxhw"])                # (batch, N, M)
+    best_iou = tf.reduce_max(iou, axis=-1)                                  # (batch, N)
+    iou_match = tf.cast(best_iou > iou_thresh, dtype=tf.float32)            # (batch, N)
+    best_idx = tf.cast(tf.argmax(iou, axis=-1), dtype=tf.int32)             # (batch, N)
+    pred_ctgr_aligned = tf.gather(pred["category"][..., 0], best_idx, batch_dims=1)     # (batch, N, 8)
+    pred_ctgr_aligned = tf.cast(pred_ctgr_aligned, dtype=tf.int32)          # (batch, N)
     ctgr_match = tf.cast(grtr_ctgr == pred_ctgr_aligned, dtype=tf.float32)  # (batch, N)
-    grtr_tp_mask = (iou_match * ctgr_match)[..., tf.newaxis]            # (batch, N, 1)
-    grtr_tp = grtr * grtr_tp_mask
-    grtr_fn = grtr * (tf.convert_to_tensor(1, dtype=tf.float32) - grtr_tp_mask)
+    grtr_tp_mask = (iou_match * ctgr_match)[..., tf.newaxis]                # (batch, N, 1)
+    grtr_fn_mask = tf.convert_to_tensor(1, dtype=tf.float32) - grtr_tp_mask # (batch, N, 1)
+    grtr_tp = {key: val * grtr_tp_mask for key, val in grtr.items()}
+    grtr_fn = {key: val * grtr_fn_mask for key, val in grtr.items()}
 
-    B, M, _ = pred.shape
+    B, M, _ = pred["category"].shape
     # last dimension rows where grtr_tp_mask == 0 are all-zero
     best_idx_onehot = tf.one_hot(best_idx, depth=M) * grtr_tp_mask          # (batch, N, M)
     pred_tp_mask = tf.reduce_max(best_idx_onehot, axis=1)[..., tf.newaxis]  # (batch, M, 1)
-    pred_tp = pred * pred_tp_mask
-    pred_fp = pred * (tf.convert_to_tensor(1, dtype=tf.float32) - pred_tp_mask)
-
-    # print("grtr_tp", grtr_tp[0])
-    # print("grtr_fn", grtr_fn[0])
-    # print("pred_tp", pred_tp[0])
-    # print("pred_fp", pred_fp[0])
+    pred_fp_mask = tf.convert_to_tensor(1, dtype=tf.float32) - pred_tp_mask  # (batch, N, 1)
+    pred_tp = {key: val * pred_tp_mask for key, val in pred.items()}
+    pred_fp = {key: val * pred_fp_mask for key, val in pred.items()}
     return {"grtr_tp": grtr_tp, "grtr_fn": grtr_fn, "pred_tp": pred_tp, "pred_fp": pred_fp}
 
 
 def count_per_class(boxes, mask, num_ctgr):
     """
-    :param boxes: object information (batch, N', dim > 5) / dim: yxhw, category index, ...
+    :param boxes: slices of object info {'yxhw': (batch, N, 4), 'category': (batch, N), ...}
     :param mask: binary validity mask (batch, N')
     :param num_ctgr: number of categories
     :return: per-class object counts
     """
-    boxes_ctgr = tf.cast(boxes[..., 4], dtype=tf.int32)  # (batch, N')
+    boxes_ctgr = tf.cast(boxes["category"][..., 0], dtype=tf.int32)  # (batch, N')
     boxes_onehot = tf.one_hot(boxes_ctgr, depth=num_ctgr) * mask[..., tf.newaxis]  # (batch, N', K)
     boxes_count = tf.reduce_sum(boxes_onehot, axis=1)
     return boxes_count
@@ -117,6 +114,8 @@ def test_count_true_positives():
         # grtr_boxes, pred_boxes: N similar boxes, NF different boxes
         grtr_boxes = tf.cast(tf.concat([grtr_tp_boxes, grtr_fn_boxes[..., :5]], axis=1), dtype=tf.float32)
         pred_boxes = tf.cast(tf.concat([pred_tp_boxes, pred_fp_boxes[..., :8]], axis=1), dtype=tf.float32)
+        grtr_boxes = uf.slice_bbox(grtr_boxes, True)
+        pred_boxes = uf.slice_bbox(pred_boxes, False)
 
         # EXECUTE
         result = count_true_positives(grtr_boxes, pred_boxes, K)

@@ -90,7 +90,10 @@ def merge_and_slice_features(features, is_gt):
         slices = slice_feature(merged_feat, is_gt)
         sliced_features[key] = slices
 
-    other_features = {key: val for key, val in features.items() if key not in scales}
+    if "bboxes" in features:
+        sliced_features["bboxes"] = slice_bbox(features["bboxes"], is_gt)
+
+    other_features = {key: val for key, val in features.items() if key not in sliced_features}
     sliced_features.update(other_features)
     return sliced_features
 
@@ -101,11 +104,26 @@ def slice_feature(feature, is_gt):
     :param is_gt: is ground truth feature map?
     :return: sliced feature maps
     """
-    channel_composition = cfg.Model.Output.get_channel_composition(is_gt)
-    names = [name for name, chan in channel_composition.items()]            # ['bbox', 'object', 'category', ...]
-    channels = [chan for name, chan in channel_composition.items()]         # [4, 1, 4, ...]
+    channel_compos = cfg.Model.Output.get_channel_composition(is_gt)
+    names = [name for name, chan in channel_compos.items()]            # ['bbox', 'object', 'category', ...]
+    channels = [chan for name, chan in channel_compos.items()]         # [4, 1, 4, ...]
     slices = tf.split(feature, channels, axis=-1)
     slices = dict(zip(names, slices))           # slices = {'bbox': (B,H,W,A,4), 'object': (B,H,W,A,1), ...}
+    return slices
+
+
+def slice_bbox(bbox, is_gt):
+    """
+    :param bbox: (batch, N, dims)
+    :param is_gt: is ground truth box data?
+    :return: sliced boxes {'yxhw': (batch, N, 4), 'category': (batch, N), ...}
+    """
+    channel_compos = cfg.Model.Output.get_bbox_composition(is_gt)
+    names = [name for name, chan in channel_compos.items()]            # ['bbox', 'category']
+    channels = [chan for name, chan in channel_compos.items()]         # [4, 1]
+    slices = tf.split(bbox, channels, axis=-1)
+    # slices = [tf.squeeze(slice) for slice in slices]
+    slices = dict(zip(names, slices))
     return slices
 
 

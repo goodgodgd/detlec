@@ -77,7 +77,7 @@ class NonMaximumSuppression:
         categories = tf.argmax(pred["category"], axis=-1)           # (batch, N)
         best_probs = tf.reduce_max(pred["category"], axis=-1)       # (batch, N)
         objectness = tf.squeeze(pred["object"])                     # (batch, N)
-        scores = objectness * best_probs            # (batch, N)
+        scores = objectness * best_probs                            # (batch, N)
         batch, numbox, numctgr = pred["category"].shape
 
         batch_indices = [[] for i in range(batch)]

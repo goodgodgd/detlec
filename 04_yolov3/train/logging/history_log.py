@@ -28,7 +28,7 @@ class HistoryLog:
         batch_data.update(objectness)
 
         num_ctgr = pred["feature_l"]["category"].shape[-1]
-        metric = count_true_positives(grtr["bboxes"], pred["nms"], num_ctgr)
+        metric = count_true_positives(grtr["bboxes"], pred["bboxes"], num_ctgr)
         batch_data.update(metric)
 
         batch_data = self.set_precision(batch_data, 5)

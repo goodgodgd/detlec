@@ -52,7 +52,8 @@ class Logger:
         self.check_nan(grtr, pred, loss_by_type)
         grtr_slices = uf.merge_and_slice_features(grtr, True)
         pred_slices = uf.merge_and_slice_features(pred, False)
-        pred_slices["nms"] = self.nms(pred_slices)
+        nms_boxes = self.nms(pred_slices)
+        pred_slices["bboxes"] = uf.slice_bbox(nms_boxes, False)
 
         self.history_logger(step, grtr_slices, pred_slices, total_loss, loss_by_type)
         if self.visual_logger:

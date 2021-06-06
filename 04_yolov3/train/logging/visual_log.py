@@ -17,7 +17,7 @@ class VisualLog:
         :param grtr: slices of GT data {'image': (B,H,W,3), 'bboxes': (B,N,6), 'feature_l': {'bbox': (B,HWA,4), ...}, ...}
         :param pred: slices of pred. data {'nms': (B,M,8), 'feature_l': {'bbox': (B,HWA,4), ...}, ...}
         """
-        splits = split_true_false(grtr["bboxes"], pred["nms"])
+        splits = split_true_false(grtr["bboxes"], pred["bboxes"])
         batch = splits["grtr_tp"].shape[0]
 
         for i in range(batch):
