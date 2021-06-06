@@ -83,7 +83,7 @@ class Train:
     MODE = ["eager", "graph"][1]
     BATCH_SIZE = 2
     TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
-    DETAIL_LOG_EPOCHS = list(range(0, 100, 5))
+    DETAIL_LOG_EPOCHS = list(range(10, 100, 5))
 
 
 class NMS:

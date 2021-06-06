@@ -37,8 +37,8 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
 
     model, loss_object, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
                                                           learning_rate, loss_weights, valid_category)
-    trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
-    validater = tv.validater_factory(train_mode, model, loss_object, val_steps, ckpt_path)
+    trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, 20)
+    validater = tv.validater_factory(train_mode, model, loss_object, 20, ckpt_path)
     log_file = LogFile(ckpt_path)
 
     for epoch in range(start_epoch, end_epoch):
