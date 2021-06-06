@@ -24,7 +24,7 @@ class HistoryLog:
         batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
         batch_data["total_loss"] = total_loss.numpy()
 
-        objectness = self.analyze_objectness(grtr, grtr)
+        objectness = self.analyze_objectness(grtr, pred)
         batch_data.update(objectness)
 
         num_ctgr = pred["feature_l"]["category"].shape[-1]
