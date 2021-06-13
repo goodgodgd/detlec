@@ -8,6 +8,7 @@ import model.model_util as mu
 from train.logging.history_log import HistoryLog
 from train.logging.visual_log import VisualLog
 from train.logging.anchor_log import AnchorLog
+import config as cfg
 
 
 class LogFile:
@@ -53,7 +54,7 @@ class Logger:
         grtr_slices = uf.merge_and_slice_features(grtr, True)
         pred_slices = uf.merge_and_slice_features(pred, False)
         nms_boxes = self.nms(pred_slices)
-        pred_slices["bboxes"] = uf.slice_bbox(nms_boxes, False)
+        pred_slices["bboxes"] = uf.slice_feature(nms_boxes, cfg.Model.Output.get_bbox_composition(False))
 
         self.history_logger(step, grtr_slices, pred_slices, total_loss, loss_by_type)
         if self.visual_logger:
@@ -84,7 +85,7 @@ class Logger:
                 print(f"nan pred:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
                 valid_result = False
         for name, loss in loss_by_type.items():
-            if loss.ndim == 0 and (np.isnan(loss) or np.isinf(loss) or loss > 100):
+            if loss.ndim == 0 and (np.isnan(loss) or np.isinf(loss) or loss > 100000):
                 print(f"nan loss: {name}, {loss}")
                 valid_result = False
         assert valid_result

@@ -46,13 +46,15 @@ class NonMaximumSuppression:
     def __init__(self, max_out=cfg.NMS.MAX_OUT,
                  iou_thresh=cfg.NMS.IOU_THRESH,
                  score_thresh=cfg.NMS.SCORE_THRESH,
+                 category_names=cfg.Tfrdata.CATEGORY_NAMES
                  ):
         self.max_out = max_out
         self.iou_thresh = iou_thresh
         self.score_thresh = score_thresh
+        self.category_names = category_names
 
     @tf.function
-    def __call__(self, pred, merged=False):
+    def __call__(self, pred, iou_thresh=None, score_thresh=None, merged=False):
         """
         :param pred: if merged True, dict of prediction slices merged over scales,
                         {'bbox': (batch, sum of Nx, 4), 'object': ..., 'category': ...}
@@ -61,6 +63,8 @@ class NonMaximumSuppression:
         :param merged
         :return: (batch, max_out, 8), 8: bbox, category, objectness, ctgr_prob, score
         """
+        self.iou_thresh = iou_thresh if iou_thresh is not None else self.iou_thresh
+        self.score_thresh = score_thresh if score_thresh is not None else self.score_thresh
         if merged is False:
             scales = [key for key in pred if "feature_" in key]
             slice_keys = list(pred[scales[0]].keys())    # ['bbox', 'object', 'category']
@@ -69,21 +73,22 @@ class NonMaximumSuppression:
             for key in slice_keys:
                 # list of (batch, HWA in scale, dim)
                 scaled_preds = [pred[scale_name][key] for scale_name in scales]
-                scaled_preds = tf.concat(scaled_preds, axis=1)      # (batch, N, dim)
+                scaled_preds = tf.concat(scaled_preds, axis=1)              # (batch, N, dim)
                 merged_pred[key] = scaled_preds
             pred = merged_pred
 
-        boxes = uf.convert_box_format_yxhw_to_tlbr(pred["bbox"])    # (batch, N, 4)
-        categories = tf.argmax(pred["category"], axis=-1)           # (batch, N)
-        best_probs = tf.reduce_max(pred["category"], axis=-1)       # (batch, N)
-        objectness = tf.squeeze(pred["object"])                     # (batch, N)
-        scores = objectness * best_probs                            # (batch, N)
+        boxes = uf.convert_box_format_yxhw_to_tlbr(pred["bbox"])          # (batch, N, 4)
+        categories = tf.argmax(pred["category"], axis=-1)                   # (batch, N)
+        best_probs = tf.reduce_max(pred["category"], axis=-1)               # (batch, N)
+        objectness = pred["object"][..., 0]                                 # (batch, N)
+        scores = objectness * best_probs                                    # (batch, N)
         batch, numbox, numctgr = pred["category"].shape
 
         batch_indices = [[] for i in range(batch)]
-        for ctgr_idx in range(numctgr):
+        for ctgr_idx in range(1, numctgr):
             ctgr_mask = tf.cast(categories == ctgr_idx, dtype=tf.float32)   # (batch, N)
             ctgr_boxes = boxes * ctgr_mask[..., tf.newaxis]                 # (batch, N, 4)
+
             ctgr_scores = scores * ctgr_mask                                # (batch, N)
             for frame_idx in range(batch):
                 selected_indices = tf.image.non_max_suppression(
@@ -107,8 +112,9 @@ class NonMaximumSuppression:
 
         # list of (batch, N) -> (batch, N, 4)
         categories = tf.cast(categories, dtype=tf.float32)
+        # PRED_BBOX_COMPOSITION: {'bbox': 4, 'category': 1, 'object': 1, 'ctgr_prob': 1, 'score': 1}
         result = tf.stack([categories, objectness, best_probs, scores], axis=-1)
-        result = tf.concat([boxes, result], axis=-1)                # (batch, N, 8)
+        result = tf.concat([pred["bbox"], result], axis=-1)                # (batch, N, 8)
         result = tf.gather(result, batch_indices, batch_dims=1)     # (batch, K*max_output, 8)
         result = result * valid_mask[..., tf.newaxis]               # (batch, K*max_output, 8)
         return result

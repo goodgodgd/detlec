@@ -87,43 +87,28 @@ def merge_and_slice_features(features, is_gt):
     for key in scales:
         raw_feat = features[key]
         merged_feat = merge_dim_hwa(raw_feat)
-        slices = slice_feature(merged_feat, is_gt)
+        channel_compos = cfg.Model.Output.get_channel_composition(is_gt)
+        slices = slice_feature(merged_feat, channel_compos)
         sliced_features[key] = slices
 
     if "bboxes" in features:
-        sliced_features["bboxes"] = slice_bbox(features["bboxes"], is_gt)
+        bbox_compos = cfg.Model.Output.get_bbox_composition(is_gt)
+        sliced_features["bboxes"] = slice_feature(features["bboxes"], bbox_compos)
 
     other_features = {key: val for key, val in features.items() if key not in sliced_features}
     sliced_features.update(other_features)
     return sliced_features
 
 
-def slice_feature(feature, is_gt):
+def slice_feature(feature, channel_composition):
     """
     :param feature: (batch, grid_h, grid_w, anchors, dims)
-    :param is_gt: is ground truth feature map?
+    :param channel_composition:
     :return: sliced feature maps
     """
-    channel_compos = cfg.Model.Output.get_channel_composition(is_gt)
-    names = [name for name, chan in channel_compos.items()]            # ['bbox', 'object', 'category', ...]
-    channels = [chan for name, chan in channel_compos.items()]         # [4, 1, 4, ...]
+    names, channels = list(channel_composition.keys()), list(channel_composition.values())
     slices = tf.split(feature, channels, axis=-1)
     slices = dict(zip(names, slices))           # slices = {'bbox': (B,H,W,A,4), 'object': (B,H,W,A,1), ...}
-    return slices
-
-
-def slice_bbox(bbox, is_gt):
-    """
-    :param bbox: (batch, N, dims)
-    :param is_gt: is ground truth box data?
-    :return: sliced boxes {'yxhw': (batch, N, 4), 'category': (batch, N), ...}
-    """
-    channel_compos = cfg.Model.Output.get_bbox_composition(is_gt)
-    names = [name for name, chan in channel_compos.items()]            # ['bbox', 'category']
-    channels = [chan for name, chan in channel_compos.items()]         # [4, 1]
-    slices = tf.split(bbox, channels, axis=-1)
-    # slices = [tf.squeeze(slice) for slice in slices]
-    slices = dict(zip(names, slices))
     return slices
 
 
@@ -133,7 +118,7 @@ def merge_dim_hwa(feature_map):
     :return: (batch, grid_h * grid_w * anchor, 5+K)
     """
     batch, grid_h, grid_w, anchor, featdim = feature_map.shape
-    merged_feat = tf.reshape(feature_map, (batch, grid_h*grid_w*anchor, featdim))
+    merged_feat = tf.reshape(feature_map, (batch, grid_h * grid_w * anchor, featdim))
     return merged_feat
 
 

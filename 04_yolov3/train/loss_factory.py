@@ -8,7 +8,7 @@ class IntegratedLoss:
     def __init__(self, loss_weights, valid_category):
         self.loss_weights = loss_weights
         # self.valid_category: binary mask of categories, (1, 1, K)
-        self.valid_category = tf.convert_to_tensor(valid_category, dtype=tf.int32)
+        self.valid_category = tf.convert_to_tensor(valid_category, dtype=tf.float32)
         self.loss_objects = self.create_loss_objects(loss_weights)
 
     def create_loss_objects(self, loss_weights):

@@ -4,6 +4,7 @@ import numpy as np
 from utils.util_class import MyExceptionToCatch
 import model.model_util as mu
 import utils.util_function as uf
+import config as cfg
 
 
 def head_factory(head, conv_args, num_anchors_per_scale, out_channels):
@@ -84,7 +85,7 @@ class FeatureDecoder:
         :param scale_name: scale name e.g. "feature_l"
         :return: decoded feature in the same shape e.g. (yxhw, objectness, category probabilities)
         """
-        slices = uf.slice_feature(feature, False)
+        slices = uf.slice_feature(feature, cfg.Model.Output.PRED_CHANNEL_COMPOSITION)
         anchors_ratio = self.anchors_per_scale[scale_name.replace("feature", "anchor")]
 
         box_yx = self.decode_yx(slices["bbox"][..., :2])

@@ -44,19 +44,23 @@ class HistoryLog:
         pos_obj, neg_obj = 0, 0
         scales = [key for key in grtr if "feature_" in key]
         for scale_name in scales:
-            grtr_obj_mask = grtr[scale_name]["object"]      # (batch, HWA, 1)
-            pred_obj_prob = pred[scale_name]["object"]      # (batch, HWA, 1)
-            obj_num = tf.maximum(tf.reduce_sum(grtr_obj_mask), 1)
-            # average positive objectness probability
-            pos_obj += tf.reduce_sum(grtr_obj_mask * pred_obj_prob) / obj_num
-            # average top 50 negative objectness probabilities per frame
-            neg_obj_map = (1. - grtr_obj_mask) * pred_obj_prob
-            neg_obj_map = tf.squeeze(neg_obj_map)
-            neg_obj_map = tf.sort(neg_obj_map, axis=-1, direction="DESCENDING")
-            neg_obj_map = neg_obj_map[:, :50]
-            neg_obj += tf.reduce_mean(neg_obj_map)
+            pos_obj_sc, neg_obj_sc = self.pos_neg_obj(grtr[scale_name]["object"], pred[scale_name]["object"])
+            pos_obj += pos_obj_sc
+            neg_obj += neg_obj_sc
         objectness = {"pos_obj": pos_obj.numpy() / len(scales), "neg_obj": neg_obj.numpy() / len(scales)}
         return objectness
+
+    def pos_neg_obj(self, grtr_obj_mask, pred_obj_prob):
+        obj_num = tf.maximum(tf.reduce_sum(grtr_obj_mask), 1)
+        pos_obj = tf.reduce_sum(grtr_obj_mask * pred_obj_prob) / obj_num
+        # average top 50 negative objectness probabilities per frame
+        neg_obj_map = (1. - grtr_obj_mask) * pred_obj_prob
+        batch, hwa, _ = neg_obj_map.shape
+        neg_obj_map = tf.reshape(neg_obj_map, (batch * hwa))
+        neg_obj_map = tf.sort(neg_obj_map, axis=0, direction="DESCENDING")
+        neg_obj_map = neg_obj_map[:50]
+        neg_obj = tf.reduce_mean(neg_obj_map)
+        return pos_obj, neg_obj
 
     def check_pred_scales(self, pred):
         raw_features = {key: tensor for key, tensor in pred.items() if key.endswith("raw")}

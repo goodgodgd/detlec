@@ -81,18 +81,19 @@ class Model:
 class Train:
     CKPT_NAME = "yolo1"
     MODE = ["eager", "graph"][1]
-    BATCH_SIZE = 2
+    BATCH_SIZE = 1
     TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
-    DETAIL_LOG_EPOCHS = list(range(10, 100, 5))
+    DETAIL_LOG_EPOCHS = list(range(0, 100, 2))
 
 
 class NMS:
-    MAX_OUT = 20
+    MAX_OUT = 30
     IOU_THRESH = 0.5
     SCORE_THRESH = 0.5
 
 
 class Validation:
+    IOU_THRESH = 0.5
     VAL_EPOCH = "latest"
 
 
