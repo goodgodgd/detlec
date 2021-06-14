@@ -39,10 +39,12 @@ class ModelFactory:
         decode_features = head.FeatureDecoder(self.anchors_per_scale)
         for i, (scale, feature) in enumerate(head_features.items()):
             output_features[scale] = decode_features(feature, scale)
-        head_features = {key + "_raw": val for key, val in head_features.items()}
+
+        head_features = {key.replace("feature_", "featraw_"): val for key, val in head_features.items()}
         output_features.update(head_features)
-        backbone_features = {key + "_raw": val for key, val in backbone_features.items()}
+        backbone_features = {key.replace("backbone_", "backraw_"): val for key, val in backbone_features.items()}
         output_features.update(backbone_features)
+
         yolo_model = tf.keras.Model(inputs=input_tensor, outputs=output_features, name="yolo_model")
         return yolo_model
 

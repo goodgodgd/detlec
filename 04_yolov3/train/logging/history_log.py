@@ -38,7 +38,7 @@ class HistoryLog:
 
         if step % 200 == 10:
             print("\n--- batch_data:", batch_data)
-        #     self.check_pred_scales(pred)
+            self.check_pred_scales(pred)
 
     def analyze_objectness(self, grtr, pred):
         pos_obj, neg_obj = 0, 0
@@ -63,11 +63,14 @@ class HistoryLog:
         return pos_obj, neg_obj
 
     def check_pred_scales(self, pred):
-        raw_features = {key: tensor for key, tensor in pred.items() if key.endswith("raw")}
-        pred_scales = dict()
-        for key, feat in raw_features.items():
-            pred_scales[key] = np.quantile(feat.numpy(), np.array([0.05, 0.5, 0.95]))
-        print("--- pred_scales:", pred_scales)
+        for key, feat in pred.items():
+            if isinstance(feat, dict):
+                for subkey, subval in feat.items():
+                    if tf.reduce_max(tf.abs(subval)).numpy() > 1e5 or (subkey == "object"):
+                        print(f"[pred scale] {key}/{subkey}:", np.quantile(subval.numpy(), np.linspace(0, 1, 6)))
+            elif tf.is_tensor(feat):
+                if tf.reduce_max(tf.abs(feat)).numpy() > 1e5:
+                    print(f"[pred scale] {key}:", np.quantile(feat.numpy(), np.linspace(0, 1, 6)))
 
     def set_precision(self, logs, precision):
         new_logs = {key: np.around(val, precision) for key, val in logs.items()}

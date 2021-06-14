@@ -66,7 +66,8 @@ class NonMaximumSuppression:
         self.iou_thresh = iou_thresh if iou_thresh is not None else self.iou_thresh
         self.score_thresh = score_thresh if score_thresh is not None else self.score_thresh
         if merged is False:
-            scales = [key for key in pred if "feature_" in key]
+            scales = [key for key in pred if "feature" in key]
+            print("nms scales:", scales)
             slice_keys = list(pred[scales[0]].keys())    # ['bbox', 'object', 'category']
             merged_pred = {}
             # merge pred features over scales
