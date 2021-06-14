@@ -26,6 +26,7 @@ def validate_main():
     for dataset_name, epochs, learning_rate, loss_weights, model_save in cfg.Train.TRAINING_PLAN:
         if start_epoch <= target_epoch < start_epoch + epochs:
             analyze_performance(dataset_name, loss_weights, weight_suffix)
+            start_epoch += epochs
 
 
 def analyze_performance(dataset_name, loss_weights, weight_suffix):
@@ -40,12 +41,11 @@ def analyze_performance(dataset_name, loss_weights, weight_suffix):
     model = try_load_weights(ckpt_path, model, weight_suffix)
     loss_object = IntegratedLoss(loss_weights, valid_category)
 
-    validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
-    log_file = LogFile(ckpt_path)
+    validater = tv.validater_factory(train_mode, model, loss_object, val_steps, ckpt_path)
 
     print(f"========== Start analyze_performance with {dataset_name} epoch: {weight_suffix} ==========")
-    val_result = validater.run_epoch(dataset_val, True)
-    log_file.save_val_log(val_result)
+    val_result = validater.run_epoch(dataset_val, 0, True)
+    print("summary:\n", val_result.get_summary())
 
 
 def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):

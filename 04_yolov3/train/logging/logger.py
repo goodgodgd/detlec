@@ -39,7 +39,7 @@ class LogFile:
         return summary
 
     def save_val_log(self, val_log):
-        pass
+        print(val_log.get_summary())
 
 
 class Logger:

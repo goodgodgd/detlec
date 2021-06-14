@@ -79,7 +79,7 @@ class Model:
 
 
 class Train:
-    CKPT_NAME = "yolo1"
+    CKPT_NAME = "yolo2"
     MODE = ["eager", "graph"][1]
     BATCH_SIZE = 1
     TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
@@ -89,7 +89,7 @@ class Train:
 class NMS:
     MAX_OUT = 30
     IOU_THRESH = 0.5
-    SCORE_THRESH = 0.5
+    SCORE_THRESH = 0.2
 
 
 class Validation:
