@@ -108,7 +108,7 @@ def slice_feature(feature, channel_composition):
     """
     names, channels = list(channel_composition.keys()), list(channel_composition.values())
     slices = tf.split(feature, channels, axis=-1)
-    slices = dict(zip(names, slices))           # slices = {'bbox': (B,H,W,A,4), 'object': (B,H,W,A,1), ...}
+    slices = dict(zip(names, slices))           # slices = {'yxhw': (B,H,W,A,4), 'object': (B,H,W,A,1), ...}
     return slices
 
 

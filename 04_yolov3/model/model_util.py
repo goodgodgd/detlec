@@ -57,9 +57,9 @@ class NonMaximumSuppression:
     def __call__(self, pred, iou_thresh=None, score_thresh=None, merged=False):
         """
         :param pred: if merged True, dict of prediction slices merged over scales,
-                        {'bbox': (batch, sum of Nx, 4), 'object': ..., 'category': ...}
+                        {'yxhw': (batch, sum of Nx, 4), 'object': ..., 'category': ...}
                      if merged False, dict of prediction slices for each scale,
-                        {'feature_l': {'bbox': (batch, Nl, 4), 'object': ..., 'category': ...}}
+                        {'feature_l': {'yxhw': (batch, Nl, 4), 'object': ..., 'category': ...}}
         :param merged
         :return: (batch, max_out, 8), 8: bbox, category, objectness, ctgr_prob, score
         """
@@ -68,7 +68,7 @@ class NonMaximumSuppression:
         if merged is False:
             scales = [key for key in pred if "feature" in key]
             print("nms scales:", scales)
-            slice_keys = list(pred[scales[0]].keys())    # ['bbox', 'object', 'category']
+            slice_keys = list(pred[scales[0]].keys())    # ['yxhw', 'object', 'category']
             merged_pred = {}
             # merge pred features over scales
             for key in slice_keys:
@@ -78,7 +78,7 @@ class NonMaximumSuppression:
                 merged_pred[key] = scaled_preds
             pred = merged_pred
 
-        boxes = uf.convert_box_format_yxhw_to_tlbr(pred["bbox"])          # (batch, N, 4)
+        boxes = uf.convert_box_format_yxhw_to_tlbr(pred["yxhw"])          # (batch, N, 4)
         categories = tf.argmax(pred["category"], axis=-1)                   # (batch, N)
         best_probs = tf.reduce_max(pred["category"], axis=-1)               # (batch, N)
         objectness = pred["object"][..., 0]                                 # (batch, N)
@@ -113,9 +113,9 @@ class NonMaximumSuppression:
 
         # list of (batch, N) -> (batch, N, 4)
         categories = tf.cast(categories, dtype=tf.float32)
-        # PRED_BBOX_COMPOSITION: {'bbox': 4, 'category': 1, 'object': 1, 'ctgr_prob': 1, 'score': 1}
+        # PRED_BBOX_COMPOSITION: {'yxhw': 4, 'category': 1, 'object': 1, 'ctgr_prob': 1, 'score': 1}
         result = tf.stack([categories, objectness, best_probs, scores], axis=-1)
-        result = tf.concat([pred["bbox"], result], axis=-1)                # (batch, N, 8)
+        result = tf.concat([pred["yxhw"], result], axis=-1)                # (batch, N, 8)
         result = tf.gather(result, batch_indices, batch_dims=1)     # (batch, K*max_output, 8)
         result = result * valid_mask[..., tf.newaxis]               # (batch, K*max_output, 8)
         return result
@@ -124,15 +124,15 @@ class NonMaximumSuppression:
 def test_nms():
     np.set_printoptions(precision=4, suppress=True, linewidth=100)
     B, N = 4, 1000
-    pred = {"feature_l": {"bbox": tf.random.uniform((B, N, 4), dtype=tf.float32),
+    pred = {"feature_l": {"yxhw": tf.random.uniform((B, N, 4), dtype=tf.float32),
                           "object": tf.random.uniform((B, N, 1), dtype=tf.float32),
                           "category": tf.random.uniform((B, N, 4), dtype=tf.float32),
                           },
-            "feature_m": {"bbox": tf.random.uniform((B, N, 4), dtype=tf.float32),
+            "feature_m": {"yxhw": tf.random.uniform((B, N, 4), dtype=tf.float32),
                           "object": tf.random.uniform((B, N, 1), dtype=tf.float32),
                           "category": tf.random.uniform((B, N, 4), dtype=tf.float32),
                           },
-            "feature_s": {"bbox": tf.random.uniform((B, N, 4), dtype=tf.float32),
+            "feature_s": {"yxhw": tf.random.uniform((B, N, 4), dtype=tf.float32),
                           "object": tf.random.uniform((B, N, 1), dtype=tf.float32),
                           "category": tf.random.uniform((B, N, 4), dtype=tf.float32),
                           }
