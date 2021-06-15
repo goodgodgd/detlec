@@ -70,7 +70,8 @@ class ObjectnessLoss(LossBase):
         """
         grtr_obj = grtr["object"]
         pred_obj = pred["object"]
-        obj_loss = tf.keras.losses.binary_crossentropy(grtr_obj, pred_obj, label_smoothing=0.04)
+        conf_focal = tf.pow(grtr_obj - pred_obj, 2)
+        obj_loss = tf.keras.losses.binary_crossentropy(grtr_obj, pred_obj, label_smoothing=0.04) * conf_focal[..., 0]
         scalar_loss = tf.reduce_sum(obj_loss)
         return scalar_loss, obj_loss
 

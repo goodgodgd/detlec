@@ -79,7 +79,7 @@ class Model:
 
 
 class Train:
-    CKPT_NAME = "yolo2"
+    CKPT_NAME = "yolo3"
     MODE = ["eager", "graph"][1]
     BATCH_SIZE = 1
     TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
