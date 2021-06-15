@@ -86,10 +86,9 @@ class NonMaximumSuppression:
         batch, numbox, numctgr = pred["category"].shape
 
         batch_indices = [[] for i in range(batch)]
-        for ctgr_idx in range(1, numctgr):
+        for ctgr_idx in range(numctgr):
             ctgr_mask = tf.cast(categories == ctgr_idx, dtype=tf.float32)   # (batch, N)
             ctgr_boxes = boxes * ctgr_mask[..., tf.newaxis]                 # (batch, N, 4)
-
             ctgr_scores = scores * ctgr_mask                                # (batch, N)
             for frame_idx in range(batch):
                 selected_indices = tf.image.non_max_suppression(
@@ -107,8 +106,8 @@ class NonMaximumSuppression:
 
         # make batch_indices, valid_mask as fixed shape tensor
         batch_indices = [tf.concat(ctgr_indices, axis=-1) for ctgr_indices in batch_indices]
-        batch_indices = tf.stack(batch_indices, axis=0)             # (batch, K*max_output)
-        valid_mask = tf.cast(batch_indices >= 0, dtype=tf.float32)  # (batch, K*max_output)
+        batch_indices = tf.stack(batch_indices, axis=0)             # (batch, K*max_out)
+        valid_mask = tf.cast(batch_indices >= 0, dtype=tf.float32)  # (batch, K*max_out)
         batch_indices = tf.maximum(batch_indices, 0)
 
         # list of (batch, N) -> (batch, N, 4)
@@ -116,8 +115,8 @@ class NonMaximumSuppression:
         # PRED_BBOX_COMPOSITION: {'yxhw': 4, 'category': 1, 'object': 1, 'ctgr_prob': 1, 'score': 1}
         result = tf.stack([categories, objectness, best_probs, scores], axis=-1)
         result = tf.concat([pred["yxhw"], result], axis=-1)                # (batch, N, 8)
-        result = tf.gather(result, batch_indices, batch_dims=1)     # (batch, K*max_output, 8)
-        result = result * valid_mask[..., tf.newaxis]               # (batch, K*max_output, 8)
+        result = tf.gather(result, batch_indices, batch_dims=1)     # (batch, K*max_out, 8)
+        result = result * valid_mask[..., tf.newaxis]               # (batch, K*max_out, 8)
         return result
 
 

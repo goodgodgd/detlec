@@ -58,6 +58,7 @@ class HistoryLog:
         batch, hwa, _ = neg_obj_map.shape
         neg_obj_map = tf.reshape(neg_obj_map, (batch * hwa))
         neg_obj_map = tf.sort(neg_obj_map, axis=0, direction="DESCENDING")
+        # print("neg_obj_map", pos_obj.numpy(), obj_num.numpy(), neg_obj_map.shape, neg_obj_map[0:50:10].numpy(), neg_obj_map[-51:-1:10].numpy())
         neg_obj_map = neg_obj_map[:50]
         neg_obj = tf.reduce_mean(neg_obj_map)
         return pos_obj, neg_obj

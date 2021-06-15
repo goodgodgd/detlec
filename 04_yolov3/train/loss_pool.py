@@ -70,7 +70,7 @@ class ObjectnessLoss(LossBase):
         """
         grtr_obj = grtr["object"]
         pred_obj = pred["object"]
-        obj_loss = tf.keras.losses.binary_crossentropy(grtr_obj, pred_obj)
+        obj_loss = tf.keras.losses.binary_crossentropy(grtr_obj, pred_obj, label_smoothing=0.04)
         scalar_loss = tf.reduce_sum(obj_loss)
         return scalar_loss, obj_loss
 
@@ -88,7 +88,7 @@ class CategoryLoss(LossBase):
         grtr_label = tf.cast(grtr["category"], dtype=tf.int32)
         grtr_onehot = tf.one_hot(grtr_label[..., 0], depth=num_cate, axis=-1)[..., tf.newaxis]
         # category_loss: (batch, HWA, K)
-        category_loss = tf.losses.binary_crossentropy(grtr_onehot, pred["category"][..., tf.newaxis], label_smoothing=0.05)
+        category_loss = tf.losses.binary_crossentropy(grtr_onehot, pred["category"][..., tf.newaxis], label_smoothing=0.04)
         category_loss = category_loss * object_mask * valid_category
         scalar_loss = tf.reduce_sum(category_loss)
         return scalar_loss, category_loss
