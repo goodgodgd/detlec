@@ -51,8 +51,8 @@ class Model:
         FEATURE_SCALES = {"feature_s": 8, "feature_m": 16, "feature_l": 32}
         FEATURE_ORDER = ["feature_s", "feature_m", "feature_l"]
         NUM_ANCHORS_PER_SCALE = 3
-        GRTR_CHANNEL_COMPOSITION = {'bbox': 4, 'object': 1, 'category': 1}
-        PRED_CHANNEL_COMPOSITION = {'bbox': 4, 'object': 1, 'category': len(Tfrdata.CATEGORY_NAMES)}
+        GRTR_CHANNEL_COMPOSITION = {'yxhw': 4, 'object': 1, 'category': 1}
+        PRED_CHANNEL_COMPOSITION = {'yxhw': 4, 'object': 1, 'category': len(Tfrdata.CATEGORY_NAMES)}
         FEATURE_CHANNELS = sum([val for key, val in PRED_CHANNEL_COMPOSITION.items()])
         GRTR_BBOX_COMPOSITION = {'yxhw': 4, 'category': 1}
         PRED_BBOX_COMPOSITION = {'yxhw': 4, 'category': 1, 'object': 1, 'ctgr_prob': 1, 'score': 1}

@@ -13,9 +13,9 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=0.5, per_class=False):
     """
     splits = split_true_false(grtr, pred, iou_thresh)
 
-    valid_grtr = tf.cast(grtr["yxhw"][..., 0] > 0, dtype=tf.float32)        # (batch, N) y > 0
-    valid_pred = tf.cast(pred["score"][..., 0] > 0, dtype=tf.float32)       # (batch, M) score > 0
-    valid_trpo = tf.cast(splits["grtr_tp"]["yxhw"][..., 0] > 0, dtype=tf.float32)   # (batch, M) y > 0
+    valid_grtr = tf.cast(grtr["yxhw"][..., 2] > 0, dtype=tf.float32)        # (batch, N)
+    valid_pred = tf.cast(pred["yxhw"][..., 2] > 0, dtype=tf.float32)       # (batch, M)
+    valid_trpo = tf.cast(splits["grtr_tp"]["yxhw"][..., 2] > 0, dtype=tf.float32)   # (batch, M)
 
     if per_class:
         grtr_count = count_per_class(grtr, valid_grtr, num_ctgr)

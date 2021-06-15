@@ -16,14 +16,14 @@ class LossBase:
 class CiouLoss(LossBase):
     def __call__(self, grtr, pred, auxi):
         """
-        :param grtr: GT feature map slices of some scale, {'bbox': (batch, HWA, 4), 'object', ..., 'category', ...}
-        :param pred: pred. feature map slices of some scale, {'bbox': (batch, HWA, 4), 'object', ..., 'category', ...}
+        :param grtr: GT feature map slices of some scale, {'yxhw': (batch, HWA, 4), 'object', ..., 'category', ...}
+        :param pred: pred. feature map slices of some scale, {'yxhw': (batch, HWA, 4), 'object', ..., 'category', ...}
         :param auxi: auxiliary data
         :return: complete-iou loss (batch, HWA)
         """
         # object_mask: (batch, HWA, 1)
         object_mask = grtr["object"]
-        ciou_loss = self.compute_ciou(grtr["bbox"], pred["bbox"])
+        ciou_loss = self.compute_ciou(grtr["yxhw"], pred["yxhw"])
         # sum over object-containing grid cells
         scalar_loss = tf.reduce_sum(object_mask[..., 0] * ciou_loss)
         return scalar_loss, ciou_loss
@@ -63,8 +63,8 @@ class CiouLoss(LossBase):
 class ObjectnessLoss(LossBase):
     def __call__(self, grtr, pred, auxi):
         """
-        :param grtr: GT feature map slices of some scale, {'bbox': (batch, HWA, 4), 'object', ..., 'category', ...}
-        :param pred: pred. feature map slices of some scale, {'bbox': (batch, HWA, 4), 'object', ..., 'category', ...}
+        :param grtr: GT feature map slices of some scale, {'yxhw': (batch, HWA, 4), 'object', ..., 'category', ...}
+        :param pred: pred. feature map slices of some scale, {'yxhw': (batch, HWA, 4), 'object', ..., 'category', ...}
         :param auxi: auxiliary data
         :return: objectness loss (batch, HWA)
         """
@@ -78,8 +78,8 @@ class ObjectnessLoss(LossBase):
 class CategoryLoss(LossBase):
     def __call__(self, grtr, pred, auxi):
         """
-        :param grtr: GT feature map slices of some scale, {'bbox': (batch, HWA, 4), 'object', ..., 'category', ...}
-        :param pred: pred. feature map slices of some scale, {'bbox': (batch, HWA, 4), 'object', ..., 'category', ...}
+        :param grtr: GT feature map slices of some scale, {'yxhw': (batch, HWA, 4), 'object', ..., 'category', ...}
+        :param pred: pred. feature map slices of some scale, {'yxhw': (batch, HWA, 4), 'object', ..., 'category', ...}
         :param auxi: auxiliary data
         :return: category loss (batch, HWA, K)
         """
