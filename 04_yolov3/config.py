@@ -4,7 +4,7 @@ import numpy as np
 
 
 class Paths:
-    RESULT_ROOT = "/home/ian/workspace/detlec/result"
+    RESULT_ROOT = "/home/ri-bear/workspace/detlec/result"
     TFRECORD = op.join(RESULT_ROOT, "tfrecord")
     CHECK_POINT = op.join(RESULT_ROOT, "ckpt")
 

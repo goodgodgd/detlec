@@ -4,7 +4,7 @@ import numpy as np
 
 class Config:
     class Paths:
-        RESULT_ROOT = "/home/ian/workspace/detlec/dataset"
+        RESULT_ROOT = "/home/ri-bear/workspace/detlec/result"
         TFRECORD = op.join(RESULT_ROOT, "tfrecord")
 
     class Tfrdata:

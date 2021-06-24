@@ -76,7 +76,7 @@ class ExampleMaker:
 
     def show_example(self, example):
         category_names = cfg.Tfrdata.CATEGORY_NAMES
-        image = tu.draw_boxes(example["image"], example["bboxes"], category_names)
+        image = tu.draw_boxes(example["image"].copy(), example["bboxes"], category_names)
         cv2.imshow("image with bboxes", image)
 
         features = []
@@ -85,7 +85,7 @@ class ExampleMaker:
             feature = feature[feature[..., 4] > 0]      # objectness == 1
             features.append(feature)
         feat_boxes = np.concatenate(features, axis=0)
-        image = tu.draw_boxes(example["image"], feat_boxes, category_names)
+        image = tu.draw_boxes(example["image"].copy(), feat_boxes, category_names)
         cv2.imshow("image with feature bboxes", image)
         cv2.waitKey(100)
 
