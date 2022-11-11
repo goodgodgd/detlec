@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 
 class Config:
-    RAW_DATA_PATH = "/home/ian/workspace/detlec/dataset/cifar-10-batches-py"
-    TFRECORD_PATH = "/home/ian/workspace/detlec/dataset/tfrecord"
+    RAW_DATA_PATH = "F:/work/dataset/cifar-10-batches-py"
+    TFRECORD_PATH = "F:/work/dataset/tfrecord"
     CLASS_NAMES = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     CIFAR_IMG_SHAPE = (32, 32, 3)
     BATCH_SIZE = 32
