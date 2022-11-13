@@ -6,6 +6,7 @@ import json
 import copy
 from glob import glob
 import shutil
+import cv2
 from timeit import default_timer as timer
 
 import utils.util_class as uc
@@ -32,9 +33,9 @@ def drive_reader_factory(dataset_cfg, split, drive_path):
 
 class TfrecordMaker:
     """
-    create tfrecord files divided in shards for a single dataset and a single split
-    get raw examples from ExampleMaker and convert them into tf.data.Example
-    serialize examples and write serialized data into tfrecord files
+    create tfrecord files divided in shards for a single dataset and a single split.
+    get raw examples from ExampleMaker and convert them into tf.data.Example.
+    serialize examples and write serialized data into tfrecord files.
     """
     def __init__(self, dataset_cfg, split, tfrpath, shard_size,
                  drive_example_limit=0, total_example_limit=0):
@@ -47,8 +48,8 @@ class TfrecordMaker:
         self.drive_example_limit = drive_example_limit
         self.total_example_limit = total_example_limit
         # indices and counts
-        self.drive_index = 0                # index of current drive
-        self.shard_index = 0                # index of current shard
+        self.drive_index = 0                # frame index in current drive
+        self.shard_index = 0                # frame index in current shard
         self.shard_example_count = 0        # number of examples in this shard
         self.drive_example_count = 0        # number of examples in this drive
         self.total_example_count = 0        # number of examples in this dataset
@@ -78,6 +79,7 @@ class TfrecordMaker:
 
             path_manager.set_ok()
         self.wrap_up()
+        cv2.destroyAllWindows()
 
     def init_drive_tfrecord(self):
         drive_name = self.drive_manger.get_drive_name(self.drive_index)

@@ -4,7 +4,7 @@ import tensorflow as tf
 import cv2
 
 import settings
-from config import Config as cfg
+import config as cfg
 import utils.util_function as uf
 
 
@@ -38,7 +38,7 @@ class TfrecordReader:
 
     def get_dataset(self):
         """
-        :return features: {"image": ..., "bboxes": ...}
+        :return features: {"image": ..., "inst": ...}
             image: (batch, height, width, 3)
             bbox: [y1, x1, y2, x2, category] (batch, grid_height, grid_width, 5)
         """
@@ -70,8 +70,8 @@ class TfrecordReader:
         dataset = dataset.batch(batch_size=self.batch_size, drop_remainder=True)
         return dataset
 
-    def get_total_steps(self):
-        return self.config["length"] // self.batch_size
+    def get_total_frames(self):
+        return self.config["length"]
 
     def get_tfr_config(self):
         return self.config
@@ -86,26 +86,17 @@ def test_read_dataset():
     print("===== start test_read_dataset")
     dataset = TfrecordReader(op.join(cfg.Paths.TFRECORD, "kitti_train"), batch_size=4).get_dataset()
     for i, x in enumerate(dataset):
-        print(f"=== index: {i}, image={x['image'].shape}, bbox={x['bboxes'].shape}"
-              f", feature_l={x['feature_l'].shape}, feature_s={x['feature_s'].shape}")
+        print(f"=== index: {i}, image={x['image'].shape}, bbox={x['inst'].shape}")
         image = uf.to_uint8_image(x['image'])
         image = image[0].numpy()
-        bboxes = x['bboxes'][0].numpy()
+        bboxes = x["inst"][0].numpy()
         image = tu.draw_boxes(image, bboxes, cfg.Tfrdata.CATEGORY_NAMES)
         cv2.imshow("image with boxes", image)
-
-        features = []
-        for feat_name in cfg.Model.FEATURE_ORDER:
-            feature = x[feat_name][0].numpy()
-            feature = feature[feature[..., 4] > 0]
-            features.append(feature)
-        feat_boxes = np.concatenate(features, axis=0)
-        image = tu.draw_boxes(image, feat_boxes, cfg.Tfrdata.CATEGORY_NAMES)
-        cv2.imshow("image with feature bboxes", image)
         key = cv2.waitKey()
         if key == ord('q'):
             break
 
+    cv2.destroyAllWindows()
     print("!!! test_read_dataset passed")
 
 

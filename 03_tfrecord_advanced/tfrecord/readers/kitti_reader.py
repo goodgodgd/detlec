@@ -67,7 +67,7 @@ class KittiReader(DatasetReaderBase):
 
 
 # ==================================================
-from config import Config as cfg
+import config as cfg
 
 
 def test_kitti_reader():

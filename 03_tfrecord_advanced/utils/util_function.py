@@ -20,7 +20,7 @@ def to_uint8_image(im_tensor):
     return tf.image.convert_image_dtype((im_tensor + 1.) / 2., dtype=tf.uint8)
 
 
-def convert_box_format_2pt_to_yxhw(boxes):
+def convert_box_format_tlbr_to_yxhw(boxes):
     # boxes: [y1, x1, y2, x2, category] -> [cy, cx, h, w, category]
     new_boxes = boxes.copy()
     new_boxes[:, 0] = (boxes[:, 0] + boxes[:, 2]) / 2.  # center y
@@ -30,7 +30,7 @@ def convert_box_format_2pt_to_yxhw(boxes):
     return new_boxes.astype(boxes.dtype)
 
 
-def convert_box_format_yxhw_to_2pt(boxes):
+def convert_box_format_yxhw_to_tlbr(boxes):
     # boxes: [cy, cx, h, w, category] -> [y1, x1, y2, x2, category]
     new_boxes = boxes.copy()
     new_boxes[:, 0] = boxes[:, 0] - boxes[:, 2] / 2.    # y1 = cy - h/2
