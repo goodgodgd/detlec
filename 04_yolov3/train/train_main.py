@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 import settings
-from config import Config as cfg
+import config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
 from model.model_factory import ModelFactory
 from train.loss_factory import IntegratedLoss
@@ -31,11 +31,11 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
         print(f"!! end_epoch {end_epoch} <= start_epoch {start_epoch}, no need to train")
         return
 
-    dataset_train, train_steps, imshape, anchors_per_scale = \
+    dataset_train, train_steps, imshape = \
         get_dataset(tfrd_path, dataset_name, False, batch_size, "train")
-    dataset_val, val_steps, _, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
+    dataset_val, val_steps, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
 
-    model, loss_object, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
+    model, loss_object, optimizer = create_training_parts(batch_size, imshape, ckpt_path,
                                                           learning_rate, loss_weights, valid_category)
     trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
     validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
@@ -59,17 +59,13 @@ def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
     frames = reader.get_total_frames()
     tfr_cfg = reader.get_tfr_config()
     image_shape = tfr_cfg["image"]["shape"]
-    # anchor sizes per scale in pixel
-    anchors_per_scale = {key: np.array(val) / np.array([image_shape[:2]]) for key, val in tfr_cfg.items() if key.startswith("anchor")}
-    anchors_per_scale = {key: val.astype(np.float32) for key, val in anchors_per_scale.items()}
-    print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, "
-          f"frames={frames},\n\tanchors={anchors_per_scale}")
-    return dataset, frames // batch_size, image_shape, anchors_per_scale
+    print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, frames={frames}")
+    return dataset, frames // batch_size, image_shape
 
 
-def create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path, learning_rate,
+def create_training_parts(batch_size, imshape, ckpt_path, learning_rate,
                           loss_weights, valid_category, weight_suffix='latest'):
-    model = ModelFactory(batch_size, imshape, anchors_per_scale).get_model()
+    model = ModelFactory(batch_size, imshape).get_model()
     model = try_load_weights(ckpt_path, model, weight_suffix)
     loss_object = IntegratedLoss(loss_weights, valid_category)
     optimizer = tf.optimizers.Adam(lr=learning_rate)

@@ -105,6 +105,7 @@ def draw_boxes(image, bboxes, category_names, box_format="yxhw"):
     if box_format == "yxhw":
         bboxes = uf.convert_box_format_yxhw_to_tlbr(bboxes)
     bboxes = bboxes[bboxes[:, 2] > 0, :]
+    bboxes = bboxes.astype(np.int32)
 
     for i, bbox in enumerate(bboxes):
         pt1, pt2 = (bbox[1], bbox[0]), (bbox[3], bbox[2])

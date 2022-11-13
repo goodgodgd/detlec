@@ -3,28 +3,30 @@ import model.backbone as back
 import model.head as head
 import utils.util_function as uf
 
-from config import Config as cfg
+import config as cfg
 import model.model_util as mu
 
 
 class ModelFactory:
-    def __init__(self, batch_size, input_shape, anchors_per_scale,
-                 backbone_name=cfg.Model.Structure.BACKBONE,
-                 head_name=cfg.Model.Structure.HEAD,
-                 backbone_conv_args=cfg.Model.Structure.BACKBONE_CONV_ARGS,
-                 head_conv_args=cfg.Model.Structure.HEAD_CONV_ARGS,
-                 num_anchors_per_scale=cfg.Model.Output.NUM_ANCHORS_PER_SCALE,
-                 out_channels=cfg.Model.Output.OUT_CHANNELS,
+    def __init__(self, batch_size, input_shape,
+                 anchors_ratio=cfg.Tfrdata.ANCHORS_RATIO,
+                 backbone_name=cfg.Architecture.BACKBONE,
+                 head_name=cfg.Architecture.HEAD,
+                 backbone_conv_args=cfg.Architecture.BACKBONE_CONV_ARGS,
+                 head_conv_args=cfg.Architecture.HEAD_CONV_ARGS,
+                 num_anchors_per_scale=cfg.ModelOutput.NUM_ANCHORS_PER_SCALE,
                  ):
         self.batch_size = batch_size
         self.input_shape = input_shape
-        self.anchors_per_scale = anchors_per_scale
         self.backbone_name = backbone_name
         self.head_name = head_name
         self.backbone_conv_args = backbone_conv_args
         self.head_conv_args = head_conv_args
         self.num_anchors_per_scale = num_anchors_per_scale
-        self.out_channels = out_channels
+        self.out_channels = sum(list(cfg.ModelOutput.PRED_FMAP_COMPOSITION(False).keys()))
+        # slice anchor ratio over scales
+        num_scales = len(cfg.ModelOutput.FEATURE_SCALES)
+        self.anchors_per_scale = [anchors_ratio[i*num_anchors_per_scale:(i+1)*num_anchors_per_scale] for i in range(num_scales)]
         mu.CustomConv2D.CALL_COUNT = -1
         print(f"[ModelFactory] batch size={batch_size}, input shape={input_shape}")
         print(f"[ModelFactory] backbone={self.backbone_name}, HEAD={self.head_name}")
@@ -32,17 +34,16 @@ class ModelFactory:
     def get_model(self):
         backbone_model = back.backbone_factory(self.backbone_name, self.backbone_conv_args)
         head_model = head.head_factory(self.head_name, self.head_conv_args, self.num_anchors_per_scale, self.out_channels)
+        feature_decoder = head.FeatureDecoder(self.anchors_per_scale)
+
         input_tensor = tf.keras.layers.Input(shape=self.input_shape, batch_size=self.batch_size)
-        backbone_features = backbone_model(input_tensor)
-        head_features = head_model(backbone_features)
-        output_features = dict()
-        decode_features = head.FeatureDecoder(self.anchors_per_scale)
-        for i, (scale, feature) in enumerate(head_features.items()):
-            output_features[scale] = decode_features(feature, scale)
-        head_features = {key + "_raw": val for key, val in head_features.items()}
-        output_features.update(head_features)
-        backbone_features = {key + "_raw": val for key, val in backbone_features.items()}
-        output_features.update(backbone_features)
+        bkbn_features = backbone_model(input_tensor)
+        head_features = head_model(bkbn_features)
+        head_slices = uf.slice_features_and_merge_dims(head_features, cfg.ModelOutput.PRED_FMAP_COMPOSITION)
+        decode_slices = feature_decoder(head_slices)
+
+        output_features = {"bkbn_logit": bkbn_features, "head_logit": head_features}
+        output_features.update(decode_slices)
         yolo_model = tf.keras.Model(inputs=input_tensor, outputs=output_features, name="yolo_model")
         return yolo_model
 

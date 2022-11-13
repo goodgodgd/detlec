@@ -17,12 +17,12 @@ class KittiDriveManager(DriveManagerBase):
         return [op.join(self.datapath, kitti_split, "image_2")]
 
     def get_drive_name(self, drive_index):
-        return f"drive{drive_index:02d}"
+        return f"kitti{drive_index:02d}"
 
 
 class KittiReader(DatasetReaderBase):
-    def __init__(self, drive_path, split, categories):
-        super().__init__(drive_path, split, categories)
+    def __init__(self, drive_path, split, dataset_cfg):
+        super().__init__(drive_path, split, dataset_cfg)
 
     def init_drive(self, drive_path, split):
         frame_names = glob(op.join(drive_path, "*.png"))
@@ -55,9 +55,9 @@ class KittiReader(DatasetReaderBase):
     def extract_box(self, line):
         raw_label = line.strip("\n").split(" ")
         category_name = raw_label[0]
-        if category_name not in self.categories:
+        if category_name not in self.dataset_cfg.CATEGORIES_TO_USE:
             return None
-        category_index = self.categories.index(category_name)
+        category_index = self.dataset_cfg.CATEGORIES_TO_USE.index(category_name)
         y1 = round(float(raw_label[5]))
         x1 = round(float(raw_label[4]))
         y2 = round(float(raw_label[7]))
@@ -67,7 +67,7 @@ class KittiReader(DatasetReaderBase):
 
 
 # ==================================================
-from config import Config as cfg
+import config as cfg
 
 
 def test_kitti_reader():

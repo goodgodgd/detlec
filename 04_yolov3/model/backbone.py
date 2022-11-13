@@ -31,7 +31,7 @@ class Darknet53(BackboneBase):
         conv'n' represents a feature map of which resolution is (input resolution / 2^n)
         e.g. input_tensor.shape[:2] == conv0.shape[:2], conv0.shape[:2]/8 == conv3.shape[:2]
         """
-        features = dict()
+        features = list()
         conv0 = self.conv2d(input_tensor, 32)
         conv1 = self.conv2d_s2(conv0, 64)
         conv1 = self.residual(conv1, 64)
@@ -43,17 +43,20 @@ class Darknet53(BackboneBase):
         conv3 = self.conv2d_s2(conv2, 256)
         for i in range(8):
             conv3 = self.residual(conv3, 256)
-        features["backbone_s"] = conv3
+        # feature small
+        features.append(conv3)
 
         conv4 = self.conv2d_s2(conv3, 512)
         for i in range(8):
             conv4 = self.residual(conv4, 512)
-        features["backbone_m"] = conv4
+        # feature medium
+        features.append(conv4)
 
         conv5 = self.conv2d_s2(conv4, 1024)
         for i in range(4):
             conv5 = self.residual(conv5, 1024)
-        features["backbone_l"] = conv5
+        # feature large
+        features.append(conv5)
 
         return features
 

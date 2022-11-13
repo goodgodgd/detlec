@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import tensorflow as tf
 
-from config import Config as cfg
+import config as cfg
 
 
 def set_gpu_configs():
@@ -38,7 +38,7 @@ def to_uint8_image(im_tensor):
 
 def convert_box_format_tlbr_to_yxhw(boxes_tlbr):
     """
-    :param boxes_tlbr: type=tf.Tensor or np.array, shape=(numbox, dim) or (batch, numbox, dim)
+    :param boxes_tlbr: type=tf.Tensor or np.array, shape=(numbox, channel) or (batch, numbox, channel)
     :return:
     """
     boxes_yx = (boxes_tlbr[..., 0:2] + boxes_tlbr[..., 2:4]) / 2    # center y,x
@@ -50,7 +50,7 @@ def convert_box_format_tlbr_to_yxhw(boxes_tlbr):
 
 def convert_box_format_yxhw_to_tlbr(boxes_yxhw):
     """
-    :param boxes_yxhw: type=tf.Tensor or np.array, shape=(numbox, dim) or (batch, numbox, dim)
+    :param boxes_yxhw: type=tf.Tensor or np.array, shape=(numbox, channel) or (batch, numbox, channel)
     :return:
     """
     boxes_tl = boxes_yxhw[..., 0:2] - (boxes_yxhw[..., 2:4] / 2)    # y1,x1 = cy,cx + h/2,w/2
@@ -76,23 +76,52 @@ def concat_box_output(output, boxes):
     return output
 
 
-def slice_features(feature, output_composition=cfg.Model.Output.OUT_COMPOSITION):
-    index = 0
-    slices = dict()
-    for name, channel in output_composition:
-        slices[name] = feature[..., index:index+channel]
-        index += channel
+def slice_features_and_merge_dims(featin, composition):
+    """
+    :param featin: [(batch, grid_h, grid_w, anchors, channels) x 3]
+    :param composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
+    :return: {"yxhw": [(batch, grid_h * grid_w * anchors, 4) x 3], "object": ..., "category": ...}
+    """
+    newfeat = []
+    for scale_data in featin:
+        slices = slice_feature(scale_data, composition)
+        slices = {key: merge_dim_hwa(fmap) for key, fmap in slices.items()}
+        newfeat.append(slices)
+    featout = scale_align_featmap(newfeat)
+    return featout
+
+
+def slice_feature(feature, channel_composition):
+    """
+    :param feature: (batch, grid_h, grid_w, anchors, channels)
+    :param channel_composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
+    :return: {"yxhw": (batch, grid_h, grid_w, anchors, 4), "object": ..., "category": ...}
+    """
+    names, channels = list(channel_composition.keys()), list(channel_composition.values())
+    slices = tf.split(feature, channels, axis=-1)
+    slices = dict(zip(names, slices))  # slices = {'yxhw': (B,H,W,A,4), 'object': (B,H,W,A,1), ...}
     return slices
 
 
-def merge_dim_hwa(feature_map):
+def merge_dim_hwa(features):
     """
-    :param feature_map: (batch, grid_h, grid_w, anchor, 5+K)
-    :return: (batch, grid_h * grid_w * anchor, 5+K)
+    :param features: (batch, grid_h, grid_w, anchor, channels)
+    :return: (batch, grid_h * grid_w * anchor, channels)
     """
-    batch, grid_h, grid_w, anchor, featdim = feature_map.shape
-    merged_feat = tf.reshape(feature_map, (batch, grid_h*grid_w*anchor, featdim))
+    batch, grid_h, grid_w, anchor, featdim = features.shape
+    merged_feat = tf.reshape(features, (batch, grid_h*grid_w*anchor, featdim))
     return merged_feat
+
+
+def scale_align_featmap(features):
+    """
+    :param features: [{"yxhw": (B,HWA,4), "object": (B,HWA,1), "category": (B,HWA,1)} x 3]
+    :return: {"yxhw": [(B,HWA,4)x3], "object": [(B,HWA,1)x3], "category": [(B,HWA,1)x3]}
+    """
+    align_feat = dict()
+    for slice_key in features[0].keys():
+        align_feat[slice_key] = [features[scale_index][slice_key] for scale_index in range(len(features))]
+    return align_feat
 
 
 def compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):

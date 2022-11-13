@@ -22,7 +22,7 @@ class HeadBase:
         self.num_anchors_per_scale = num_anchors_per_scale
         self.out_channels = out_channels
 
-    def __call__(self, input_features):
+    def __call__(self, bkbn_features):
         raise NotImplementedError()
 
     def conv_5x(self, x, channel):
@@ -45,10 +45,10 @@ class FPN(HeadBase):
     def __init__(self, model_cfg, num_anchors_per_scale, out_channels):
         super().__init__(model_cfg, num_anchors_per_scale, out_channels)
 
-    def __call__(self, input_features):
-        large = input_features["backbone_l"]
-        medium = input_features["backbone_m"]
-        small = input_features["backbone_s"]
+    def __call__(self, bkbn_features):
+        small = bkbn_features[0]
+        medium = bkbn_features[1]
+        large = bkbn_features[2]
         conv = self.conv_5x(large, 512)
         conv_lbbox = self.make_output(conv, 1024)
 
@@ -59,7 +59,7 @@ class FPN(HeadBase):
         conv_small = self.upsample_concat(conv_medium, small, 128)
         conv = self.conv_5x(conv_small, 128)
         conv_sbbox = self.make_output(conv, 256)
-        conv_result = {"feature_l": conv_lbbox, "feature_m": conv_mbbox, "feature_s": conv_sbbox}
+        conv_result = [conv_sbbox, conv_mbbox, conv_lbbox]
         return conv_result
 
     def upsample_concat(self, upper, lower, channel):
@@ -78,23 +78,19 @@ class FeatureDecoder:
         self.const_3 = tf.constant(3, dtype=tf.float32)
         self.const_log_2 = tf.math.log(tf.constant(2, dtype=tf.float32))
 
-    def __call__(self, feature, scale_name: str):
+    def __call__(self, slices):
         """
-        :param feature: raw feature map predicted by model (batch, grid_h, grid_w, anchor, channel)
-        :param scale_name: scale name e.g. "feature_l"
-        :return: decoded feature in the same shape e.g. (yxhw, objectness, category probabilities)
+        :param slices: sliced head feature maps {"yxhw": [(B,H/32*W/32*A,C), (B,H/16*W/16*A,C), (B,H/8*W/8*A,C)], ...}
+        :return: decoded feature in the same shape e.g. {"yxhw": [...], "object": [...], "category": [...]}
         """
-        slices = uf.slice_features(feature)
-        anchors_ratio = self.anchors_per_scale[scale_name.replace("feature", "anchor")]
-
-        box_yx = self.decode_yx(slices["bbox"][..., :2])
-        box_hw = self.decode_hw(slices["bbox"][..., 2:], anchors_ratio)
-        objectness = tf.sigmoid(slices["object"])
-        cat_probs = tf.sigmoid(slices["category"])
-
-        bbox_pred = tf.concat([box_yx, box_hw, objectness, cat_probs], axis=-1)
-        assert bbox_pred.shape == feature.shape
-        return tf.cast(bbox_pred, dtype=tf.float32)
+        decoded = {key: [] for key in slices.keys()}
+        for anchors_ratio in self.anchors_per_scale:
+            box_yx = self.decode_yx(slices["yxhw"][..., :2])
+            box_hw = self.decode_hw(slices["yxhw"][..., 2:], anchors_ratio)
+            decoded["yxhw"].append(tf.concat([box_yx, box_hw], axis=-1))
+            decoded["object"].append(tf.sigmoid(slices["object"]))
+            decoded["object"].append(tf.sigmoid(slices["category"]))
+        return decoded
 
     def decode_yx(self, yx_raw):
         """
@@ -137,7 +133,7 @@ class FeatureDecoder:
 
 
 # ==================================================
-from config import Config as cfg
+import config as cfg
 
 
 def test_feature_decoder():

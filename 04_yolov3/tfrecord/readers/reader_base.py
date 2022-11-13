@@ -15,9 +15,9 @@ class DriveManagerBase:
 
 
 class DatasetReaderBase:
-    def __init__(self, drive_path, split, categories):
+    def __init__(self, drive_path, split, dataset_cfg):
         self.frame_names = self.init_drive(drive_path, split)
-        self.categories = categories
+        self.dataset_cfg = dataset_cfg
 
     def init_drive(self, drive_path, split):
         """

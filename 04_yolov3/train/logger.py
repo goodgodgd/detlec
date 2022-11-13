@@ -5,7 +5,7 @@ import pandas as pd
 from timeit import default_timer as timer
 
 import utils.util_function as uf
-from config import Config as cfg
+import config as cfg
 
 
 class LogFile:
@@ -36,21 +36,20 @@ class LogFile:
 
 class LogData:
     def __init__(self):
-        self.batch = pd.DataFrame()
+        self.log = pd.DataFrame()
         self.start = timer()
         self.summary = dict()
         self.nan_grad_count = 0
 
     def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
-        loss_list = [loss_name for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0]
-        batch_data = {loss_name: loss_by_type[loss_name].numpy() for loss_name in loss_list}
+        batch_data = {loss_name: loss_tensor.numpy() for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0}
         batch_data["total_loss"] = total_loss.numpy()
         objectness = self.analyze_objectness(grtr, pred)
         batch_data.update(objectness)
 
         self.check_nan(batch_data, grtr, pred)
         batch_data = self.set_precision(batch_data, 5)
-        self.batch = self.batch.append(batch_data, ignore_index=True)
+        self.log = self.log.append(batch_data, ignore_index=True)
         if step % 200 == 10:
             print("\n--- batch_data:", batch_data)
         #     self.check_pred_scales(pred)
@@ -94,10 +93,10 @@ class LogData:
         assert valid_result
 
     def check_pred_scales(self, pred):
-        raw_features = {key: tensor for key, tensor in pred.items() if key.endswith("raw")}
+        raw_features = {key: tensor.numpy() for key, tensor in pred.items() if key.endswith("_map")}
         pred_scales = dict()
         for key, feat in raw_features.items():
-            pred_scales[key] = np.quantile(feat.numpy(), np.array([0.05, 0.5, 0.95]))
+            pred_scales[key] = np.quantile(feat, np.array([0.05, 0.5, 0.95]))
         print("--- pred_scales:", pred_scales)
 
     def set_precision(self, logs, precision):
@@ -105,9 +104,9 @@ class LogData:
         return new_logs
 
     def finalize(self):
-        self.summary = self.batch.mean(axis=0).to_dict()
+        self.summary = self.log.mean(axis=0).to_dict()
         self.summary["time_m"] = round((timer() - self.start)/60., 5)
-        print("finalize:", self.summary)
+        print("result summary:", self.summary)
     
     def get_summary(self):
         return self.summary
