@@ -138,12 +138,12 @@ class ExampleCategoryRemapper(PreprocessBase):
         return remap
 
     def __call__(self, example):
-        old_categs = example["inst"][:, 4]
+        old_categs = example["inst"][:, 5]
         new_categs = old_categs.copy()
         # replace category indices by category_remap
         for key, val in self.category_remap.items():
             new_categs[old_categs == key] = val
-        example["inst"][:, 4] = new_categs
+        example["inst"][:, 5] = new_categs
         # filter out invalid category
         example["inst"] = example["inst"][new_categs != self.INVALID_CATEGORY, :]
         return example
@@ -156,7 +156,7 @@ class ExampleZeroPadBbox(PreprocessBase):
     def __call__(self, example):
         bboxes = example["inst"]
         if bboxes.shape[0] < self.max_bbox:
-            new_bboxes = np.zeros((self.max_bbox, 5), dtype=np.float32)
+            new_bboxes = np.zeros((self.max_bbox, bboxes.shape[-1]), dtype=np.float32)
             new_bboxes[:bboxes.shape[0]] = bboxes
             example["inst"] = new_bboxes
         return example

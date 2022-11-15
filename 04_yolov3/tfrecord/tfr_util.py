@@ -108,8 +108,9 @@ def draw_boxes(image, bboxes, category_names, box_format="yxhw"):
     bboxes = bboxes.astype(np.int32)
 
     for i, bbox in enumerate(bboxes):
+        print("bbox", bbox)
         pt1, pt2 = (bbox[1], bbox[0]), (bbox[3], bbox[2])
-        cat_index = int(bbox[4])
+        cat_index = int(bbox[5])
         category = category_names[cat_index]
         image = cv2.rectangle(image, pt1, pt2, (255, 0, 0), thickness=2)
         image = cv2.putText(image, f"{i}{category}", pt1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)

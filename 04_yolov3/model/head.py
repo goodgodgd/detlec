@@ -78,26 +78,27 @@ class FeatureDecoder:
         self.const_3 = tf.constant(3, dtype=tf.float32)
         self.const_log_2 = tf.math.log(tf.constant(2, dtype=tf.float32))
 
-    def __call__(self, slices):
+    def __call__(self, slices, features):
         """
-        :param slices: sliced head feature maps {"yxhw": [(B,H/32*W/32*A,C), (B,H/16*W/16*A,C), (B,H/8*W/8*A,C)], ...}
+        :param slices: sliced head feature maps {"yxhw": [(batch, grid_h*grid_w*anchor, channel) x 3], ...}
+        :param features: whole head feature maps [(batch, grid_h*grid_w*anchor, channel) x 3]
         :return: decoded feature in the same shape e.g. {"yxhw": [...], "object": [...], "category": [...]}
         """
         decoded = {key: [] for key in slices.keys()}
-        for anchors_ratio in self.anchors_per_scale:
-            box_yx = self.decode_yx(slices["yxhw"][..., :2])
-            box_hw = self.decode_hw(slices["yxhw"][..., 2:], anchors_ratio)
+        for si, anchors_ratio in enumerate(self.anchors_per_scale):
+            box_yx = self.decode_yx(slices["yxhw"][si][..., :2], features[si].shape)
+            box_hw = self.decode_hw(slices["yxhw"][si][..., 2:], anchors_ratio, features[si].shape)
             decoded["yxhw"].append(tf.concat([box_yx, box_hw], axis=-1))
-            decoded["object"].append(tf.sigmoid(slices["object"]))
-            decoded["object"].append(tf.sigmoid(slices["category"]))
+            decoded["object"].append(tf.sigmoid(slices["object"][si]))
+            decoded["category"].append(tf.sigmoid(slices["category"][si]))
         return decoded
 
-    def decode_yx(self, yx_raw):
+    def decode_yx(self, yx_raw, feat_shape):
         """
-        :param yx_raw: (batch, grid_h, grid_w, anchor, 2)
-        :return: yx_dec = yx coordinates of box centers in ratio to image (batch, grid_h, grid_w, anchor, 2)
+        :param yx_raw: (batch, grid_h*grid_w*anchor, 2)
+        :return: yx_dec = yx coordinates of box centers in ratio to image (batch, grid_h*grid_w*anchor, 2)
         """
-        grid_h, grid_w = yx_raw.shape[1:3]
+        batch, grid_h, grid_w, num_anc, _ = feat_shape
         """
         Original yolo v3 implementation: yx_dec = tf.sigmoid(yx_raw)
         For yx_dec to be close to 0 or 1, yx_raw should be -+ infinity
@@ -109,26 +110,29 @@ class FeatureDecoder:
         grid = tf.stack([grid_y, grid_x], axis=-1)
         grid = tf.reshape(grid, (1, grid_h, grid_w, 1, 2))
         grid = tf.cast(grid, tf.float32)
-        divider = tf.reshape([grid_h, grid_w], (1, 1, 1, 1, 2))
-        divider = tf.cast(divider, tf.float32)
+        divider = tf.constant([grid_h, grid_w], dtype=tf.float32)
 
-        yx_box = tf.sigmoid(yx_raw) * 1.4 - 0.2
-        # [(batch, grid_h, grid_w, anchor, 2) + (1, grid_h, grid_w, 1, 2)] / (1, 1, 1, 1, 2)
+        yx_reshape = tf.reshape(yx_raw, (batch, grid_h, grid_w, num_anc, 2))
+        yx_box = tf.sigmoid(yx_reshape) * 1.4 - 0.2
+        # [(batch, grid_h, grid_w, anchor, 2) + (1, grid_h, grid_w, 1, 2)] / (2)
         yx_dec = (yx_box + grid) / divider
+        yx_dec = tf.reshape(yx_dec, (batch, -1, 2))
         return yx_dec
 
-    def decode_hw(self, hw_raw, anchors_ratio):
+    def decode_hw(self, hw_raw, anchors_ratio, feat_shape):
         """
-        :param hw_raw: (batch, grid_h, grid_w, anchor, 2)
+        :param hw_raw: (batch, grid_h*grid_w*anchor, 2)
         :param anchors_ratio: [height, width]s of anchors in ratio to image (0~1), (anchor, 2)
         :return: hw_dec = heights and widths of boxes in ratio to image (batch, grid_h, grid_w, anchor, 2)
         """
-        num_anc, channel = anchors_ratio.shape     # (3, 2)
-        anchors_tf = tf.reshape(anchors_ratio, (1, 1, 1, num_anc, channel))
+        batch, grid_h, grid_w, num_anc, _ = feat_shape
+        anchors_tf = tf.constant(anchors_ratio)
+        hw_reshape = tf.reshape(hw_raw, (batch, grid_h, grid_w, num_anc, 2))
         # NOTE: exp activation may result in infinity
-        # hw_dec = tf.exp(hw_raw) * anchors_tf
+        # hw_dec = tf.exp(hw_raw) * anchors_tf      (B, GH, GW, A, 2) * (A, 2)
         # hw_dec: 0~3 times of anchor, the delayed sigmoid passes through (0, 1)
-        hw_dec = self.const_3 * tf.sigmoid(hw_raw - self.const_log_2) * anchors_tf
+        hw_dec = self.const_3 * tf.sigmoid(hw_reshape - self.const_log_2) * anchors_tf
+        hw_dec = tf.reshape(hw_dec, (batch, -1, 2))
         return hw_dec
 
 

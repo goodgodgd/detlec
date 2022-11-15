@@ -4,6 +4,7 @@ from timeit import default_timer as timer
 
 import utils.util_function as uf
 from train.logger import LogData
+from train.fmap_generator import SinglePositivePolicy
 
 
 def trainer_factory(mode, model, loss_object, optimizer, steps):
@@ -26,6 +27,7 @@ class TrainValBase:
         self.loss_object = loss_object
         self.optimizer = optimizer
         self.epoch_steps = epoch_steps
+        self.fmap_generator = SinglePositivePolicy()
 
     def run_epoch(self, dataset):
         logger = LogData()
@@ -52,6 +54,7 @@ class ModelEagerTrainer(TrainValBase):
         super().__init__(model, loss_object, optimizer, epoch_steps)
     
     def run_batch(self, features):
+        features = self.fmap_generator(features)
         return self.train_step(features)
 
     def train_step(self, features):
@@ -69,8 +72,14 @@ class ModelGraphTrainer(ModelEagerTrainer):
         super().__init__(model, loss_object, optimizer, epoch_steps)
     
     @tf.function
-    def run_batch(self, features):
-        return self.train_step(features)
+    def train_step(self, features):
+        with tf.GradientTape() as tape:
+            prediction = self.model(features["image"])
+            total_loss, loss_by_type = self.loss_object(features, prediction)
+
+        grads = tape.gradient(total_loss, self.model.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
+        return prediction, total_loss, loss_by_type
 
 
 class ModelEagerValidater(TrainValBase):

@@ -23,7 +23,9 @@ class ExampleMaker:
     def get_example(self, index):
         example = dict()
         example["image"] = self.data_reader.get_image(index)
-        example["inst"] = self.data_reader.get_bboxes(index)
+        bbox = self.data_reader.get_bboxes(index)
+        category = self.data_reader.get_categories(index)
+        example["inst"] = np.concatenate([bbox, np.ones_like(category), category], axis=-1, dtype=np.float32)
         example = self.preprocess_example(example)
         if index % 100 == 10:
             self.show_example(example)

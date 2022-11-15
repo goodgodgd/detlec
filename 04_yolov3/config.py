@@ -35,10 +35,10 @@ class Tfrdata:
 
 
 class ModelOutput:
-    FEATURE_SCALES = [32, 16, 8]
+    FEATURE_SCALES = [8, 16, 32]
     NUM_ANCHORS_PER_SCALE = 3
     GRTR_FMAP_COMPOSITION = {"yxhw": 4, "object": 1, "category": 1}
-    PRED_FMAP_COMPOSITION = {"yxhw": 4, "object": 1, "category":  len(Tfrdata.CATEGORY_NAMES)}
+    PRED_FMAP_COMPOSITION = {"yxhw": 4, "object": 1, "category": len(Tfrdata.CATEGORY_NAMES)}
     ANCHORS_RATIO = None  # assigned by update_anchors()
 
 
@@ -56,34 +56,12 @@ class Train:
     TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
 
 
-def get_valid_category_mask(dataset="kitti"):
-    """
-    :param dataset: dataset name
-    :return: binary mask e.g. when
-        Tfrdata.CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"] and
-        Dataset.CATEGORIES_TO_USE = ["Pedestrian", "Car", "Van", "Truck"]
-        Dataset.CATEGORY_REMAP = {"Pedestrian": "Person"}
-        this function returns [1 1 1 0] because ["Person", "Car", "Van"] are included in dataset categories
-        but "Bicycle" is not
-    """
-    dataset_cfg = Datasets.get_dataset_config(dataset)
-    renamed_categories = [dataset_cfg.CATEGORY_REMAP[categ] if categ in dataset_cfg.CATEGORY_REMAP else categ
-                          for categ in dataset_cfg.CATEGORIES_TO_USE]
-
-    mask = np.zeros((len(Tfrdata.CATEGORY_NAMES), ), dtype=np.int32)
-    for categ in renamed_categories:
-        if categ in Tfrdata.CATEGORY_NAMES:
-            index = Tfrdata.CATEGORY_NAMES.index(categ)
-            mask[index] = 1
-    return mask
-
-
 def change_dataset(dataset_name):
     Datasets.TARGET_DATASET = dataset_name
     update_anchors(dataset_name)
 
 
-def update_anchors(dataset=None):
+def update_anchors(dataset="kitti"):
     basic_anchor = params.Anchor.COCO_YOLOv3                                        # [[13, 10], ...]
     dataset_cfg = Datasets.get_dataset_config(dataset)
     input_resolution = np.array(dataset_cfg.INPUT_RESOLUTION, dtype=np.float32)     # (256, 832)

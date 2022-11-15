@@ -145,3 +145,36 @@ def compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):
     iou = inter_area / (pred_area + grtr_area - inter_area + 0.00001)
     return iou
 
+
+def print_structure(title, data, key=""):
+    if isinstance(data, list):
+        for i, datum in enumerate(data):
+            print_structure(title, datum, f"{key}/{i}")
+    elif isinstance(data, dict):
+        for subkey, datum in data.items():
+            print_structure(title, datum, f"{key}/{subkey}")
+    elif isinstance(data, tuple):
+        for i, datum in enumerate(data):
+            print_structure(title, datum, f"{key}/{i}")
+    elif type(data) == np.ndarray:
+        print(title, key, data.shape, "np", data.dtype)
+    elif tf.is_tensor(data):
+        print(title, key, data.shape, "tf", data.dtype)
+    else:
+        print(title, key, data)
+
+
+def convert_to_numpy(data):
+    if isinstance(data, list):
+        for i, datum in enumerate(data):
+            data[i] = convert_to_numpy(datum)
+    elif isinstance(data, dict):
+        for key, datum in data.items():
+            data[key] = convert_to_numpy(datum)
+    elif tf.is_tensor(data):
+        return data.numpy()
+    return data
+
+
+
+

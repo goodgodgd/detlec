@@ -23,6 +23,9 @@ class KittiDriveManager(DriveManagerBase):
 class KittiReader(DatasetReaderBase):
     def __init__(self, drive_path, split, dataset_cfg):
         super().__init__(drive_path, split, dataset_cfg)
+        self.cur_frame = -1
+        self.bbox = None
+        self.category = None
 
     def init_drive(self, drive_path, split):
         frame_names = glob(op.join(drive_path, "*.png"))
@@ -41,18 +44,31 @@ class KittiReader(DatasetReaderBase):
         """
         :return: bounding boxes in 'yxhw' format
         """
+        self.read_text(index)
+        return self.bbox
+
+    def get_categories(self, index):
+        self.read_text(index)
+        return self.category
+
+    def read_text(self, index):
+        if self.cur_frame == index:
+            return
         image_file = self.frame_names[index]
         label_file = image_file.replace("image_2", "label_2").replace(".png", ".txt")
         with open(label_file, 'r') as f:
             lines = f.readlines()
-            bboxes = [self.extract_box(line) for line in lines]
+            bboxes = [self.read_line(line) for line in lines]
             bboxes = [bbox for bbox in bboxes if bbox is not None]
         if not bboxes:
             raise uc.MyExceptionToCatch("[get_bboxes] empty boxes")
         bboxes = np.array(bboxes)
+        self.bbox = bboxes[:, :-1]
+        self.category = bboxes[:, -1:]
+        self.cur_frame = index
         return bboxes
 
-    def extract_box(self, line):
+    def read_line(self, line):
         raw_label = line.strip("\n").split(" ")
         category_name = raw_label[0]
         if category_name not in self.dataset_cfg.CATEGORIES_TO_USE:

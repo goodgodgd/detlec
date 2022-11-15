@@ -9,7 +9,7 @@ import model.model_util as mu
 
 class ModelFactory:
     def __init__(self, batch_size, input_shape,
-                 anchors_ratio=cfg.Tfrdata.ANCHORS_RATIO,
+                 anchors_ratio=cfg.ModelOutput.ANCHORS_RATIO,
                  backbone_name=cfg.Architecture.BACKBONE,
                  head_name=cfg.Architecture.HEAD,
                  backbone_conv_args=cfg.Architecture.BACKBONE_CONV_ARGS,
@@ -23,7 +23,7 @@ class ModelFactory:
         self.backbone_conv_args = backbone_conv_args
         self.head_conv_args = head_conv_args
         self.num_anchors_per_scale = num_anchors_per_scale
-        self.out_channels = sum(list(cfg.ModelOutput.PRED_FMAP_COMPOSITION(False).keys()))
+        self.out_channels = sum(list(cfg.ModelOutput.PRED_FMAP_COMPOSITION.values()))
         # slice anchor ratio over scales
         num_scales = len(cfg.ModelOutput.FEATURE_SCALES)
         self.anchors_per_scale = [anchors_ratio[i*num_anchors_per_scale:(i+1)*num_anchors_per_scale] for i in range(num_scales)]
@@ -40,11 +40,23 @@ class ModelFactory:
         bkbn_features = backbone_model(input_tensor)
         head_features = head_model(bkbn_features)
         head_slices = uf.slice_features_and_merge_dims(head_features, cfg.ModelOutput.PRED_FMAP_COMPOSITION)
-        decode_slices = feature_decoder(head_slices)
+        decode_slices = feature_decoder(head_slices, head_features)
 
-        output_features = {"bkbn_logit": bkbn_features, "head_logit": head_features}
-        output_features.update(decode_slices)
-        yolo_model = tf.keras.Model(inputs=input_tensor, outputs=output_features, name="yolo_model")
+        outputs = {"bkbn_logit": bkbn_features, "head_logit": head_features}
+        outputs.update(decode_slices)
+        outputs = {"fmap": outputs}
+        yolo_model = tf.keras.Model(inputs=input_tensor, outputs=outputs, name="yolo_model")
+        """
+        outputs = {"fmap": 
+                    {"bkbn_logit": [(B,GH,GW,C) x 3], 
+                     "head_logit": [(B,GH,GW,C) x 3]
+                     "yxhw": [(B,GH*GW*A,4) x 3],
+                     "object": [(B,GH*GW*A,1) x 3],
+                     "category": [(B,GH*GW*A,K) x 3]
+                    }
+                  }
+        (GH,GW = H//S,W//S where S in [8,16,32])
+        """
         return yolo_model
 
 

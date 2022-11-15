@@ -1,6 +1,5 @@
 import os.path as op
 import numpy as np
-import tensorflow as tf
 import pandas as pd
 from timeit import default_timer as timer
 
@@ -42,66 +41,54 @@ class LogData:
         self.nan_grad_count = 0
 
     def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
-        batch_data = {loss_name: loss_tensor.numpy() for loss_name, loss_tensor in loss_by_type.items() if loss_tensor.ndim == 0}
-        batch_data["total_loss"] = total_loss.numpy()
+        grtr = uf.convert_to_numpy(grtr)
+        pred = uf.convert_to_numpy(pred)
+        loss_by_type = uf.convert_to_numpy(loss_by_type)
+        total_loss = total_loss.numpy()
+
+        assert self.check_scales("[pred scale]", pred) == 0
+        assert self.check_scales("[loss scale]", loss_by_type) == 0
+
+        batch_data = {loss_name: loss_tensor for loss_name, loss_tensor in loss_by_type.items() if not isinstance(loss_tensor, list)}
+        batch_data["total_loss"] = total_loss
         objectness = self.analyze_objectness(grtr, pred)
         batch_data.update(objectness)
-
-        self.check_nan(batch_data, grtr, pred)
-        batch_data = self.set_precision(batch_data, 5)
-        self.log = self.log.append(batch_data, ignore_index=True)
+        batch_data = {key: np.around(val, 5) for key, val in batch_data.items()}
+        self.log = pd.concat([self.log, pd.DataFrame([batch_data])], axis=0, ignore_index=True)
         if step % 200 == 10:
             print("\n--- batch_data:", batch_data)
-        #     self.check_pred_scales(pred)
 
     def analyze_objectness(self, grtr, pred):
         pos_obj, neg_obj = 0, 0
-        scales = [key for key in grtr if "feature_" in key]
-        for scale_name in scales:
-            grtr_slices = uf.slice_features(grtr[scale_name])
-            pred_slices = uf.slice_features(pred[scale_name])
-            grtr_obj_mask = grtr_slices["object"]
-            pred_obj_prob = pred_slices["object"]
-            obj_num = tf.maximum(tf.reduce_sum(grtr_obj_mask), 1)
+        num_scales = len(pred["fmap"]["object"])
+        for grtr_obj_mask, pred_obj_prob in zip(grtr["fmap"]["object"], pred["fmap"]["object"]):
+            obj_num = np.maximum(np.sum(grtr_obj_mask), 1)
             # average positive objectness probability
-            pos_obj += tf.reduce_sum(grtr_obj_mask * pred_obj_prob) / obj_num
-            # average top 50 negative objectness probabilities per frame
+            pos_obj += np.sum(grtr_obj_mask * pred_obj_prob) / obj_num
+            # average top 20 negative objectness probabilities per frame
             neg_obj_map = (1. - grtr_obj_mask) * pred_obj_prob
-            batch, grid_h, grid_w, anchor, _ = neg_obj_map.shape
-            neg_obj_map = tf.reshape(neg_obj_map, (batch, grid_h * grid_w * anchor))
-            neg_obj_map = tf.sort(neg_obj_map, axis=-1, direction="DESCENDING")
-            neg_obj_map = neg_obj_map[:, :50]
-            neg_obj += tf.reduce_mean(neg_obj_map)
-        objectness = {"pos_obj": pos_obj.numpy() / len(scales), "neg_obj": neg_obj.numpy() / len(scales)}
+            neg_obj_map = np.squeeze(neg_obj_map, axis=-1)
+            neg_obj_map = np.sort(neg_obj_map, axis=-1)[:, ::-1]
+            neg_obj_map = neg_obj_map[:, :20]
+            neg_obj += np.mean(neg_obj_map)
+        
+        objectness = {"pos_obj": pos_obj / num_scales, "neg_obj": neg_obj / num_scales}
         return objectness
 
-    def check_nan(self, losses, grtr, pred):
-        valid_result = True
-        for name, loss in losses.items():
-            if np.isnan(loss) or np.isinf(loss) or loss > 100:
-                print(f"nan loss: {name}, {loss}")
-                valid_result = False
-        for name, tensor in pred.items():
-            if not np.isfinite(tensor.numpy()).all():
-                print(f"nan pred:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
-                valid_result = False
-        for name, tensor in grtr.items():
-            if not np.isfinite(tensor.numpy()).all():
-                print(f"nan grtr:", name, np.quantile(tensor.numpy(), np.linspace(0, 1, 11)))
-                valid_result = False
-
-        assert valid_result
-
-    def check_pred_scales(self, pred):
-        raw_features = {key: tensor.numpy() for key, tensor in pred.items() if key.endswith("_map")}
-        pred_scales = dict()
-        for key, feat in raw_features.items():
-            pred_scales[key] = np.quantile(feat, np.array([0.05, 0.5, 0.95]))
-        print("--- pred_scales:", pred_scales)
-
-    def set_precision(self, logs, precision):
-        new_logs = {key: np.around(val, precision) for key, val in logs.items()}
-        return new_logs
+    def check_scales(self, title, data, key=""):
+        div_count = 0
+        if isinstance(data, list):
+            for i, datum in enumerate(data):
+                div_count += self.check_scales(title, datum, f"{key}/{i}")
+        elif isinstance(data, dict):
+            for subkey, datum in data.items():
+                div_count += self.check_scales(title, datum, f"{key}/{subkey}")
+        elif type(data) == np.ndarray:
+            quant = np.quantile(data, np.array([0.05, 0.5, 0.95]))
+            if np.max(np.abs(quant)) > 1e+6:
+                print(title, key, data.shape, type(data), quant)
+                div_count += 1
+        return div_count
 
     def finalize(self):
         self.summary = self.log.mean(axis=0).to_dict()
