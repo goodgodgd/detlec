@@ -4,6 +4,8 @@ import pandas as pd
 from timeit import default_timer as timer
 
 import utils.util_function as uf
+import model.model_util as mu
+import train.metric as mt
 import config as cfg
 
 
@@ -38,7 +40,8 @@ class LogData:
         self.log = pd.DataFrame()
         self.start = timer()
         self.summary = dict()
-        self.nan_grad_count = 0
+        self.nms_box = mu.NonMaximumSuppressionBox()
+        self.num_ctgr = len(cfg.Tfrdata.CATEGORY_NAMES)
 
     def append_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
         grtr = uf.convert_to_numpy(grtr)
@@ -50,9 +53,11 @@ class LogData:
         assert self.check_scales("[loss scale]", loss_by_type) == 0
 
         batch_data = {loss_name: loss_tensor for loss_name, loss_tensor in loss_by_type.items() if not isinstance(loss_tensor, list)}
-        batch_data["total_loss"] = total_loss
+        metric = self.compute_metric(grtr, pred)
+        batch_data.update(metric)
         objectness = self.analyze_objectness(grtr, pred)
         batch_data.update(objectness)
+        batch_data["total_loss"] = total_loss
         batch_data = {key: np.around(val, 5) for key, val in batch_data.items()}
         self.log = pd.concat([self.log, pd.DataFrame([batch_data])], axis=0, ignore_index=True)
         if step % 200 == 10:
@@ -74,6 +79,13 @@ class LogData:
         
         objectness = {"pos_obj": pos_obj / num_scales, "neg_obj": neg_obj / num_scales}
         return objectness
+
+    def compute_metric(self, grtr, pred):
+        pred_inst = self.nms_box(pred["fmap"])
+        pred_inst = uf.slice_feature(pred_inst, cfg.ModelOutput.GRTR_FMAP_COMPOSITION)
+        counts = mt.count_true_positives(grtr["inst"], pred_inst, self.num_ctgr)
+        metric = {"recall": counts["trpo"] / counts["grtr"], "precision": counts["trpo"] / counts["pred"]}
+        return metric
 
     def check_scales(self, title, data, key=""):
         div_count = 0

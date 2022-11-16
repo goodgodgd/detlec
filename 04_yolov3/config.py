@@ -56,6 +56,12 @@ class Train:
     TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
 
 
+class NmsInfer:
+    MAX_OUT = [10, 10, 10, 10]
+    IOU_THRESH = [0.3, 0.3, 0.3, 0.3]
+    SCORE_THRESH = [0.2, 0.2, 0.2, 0.2]
+
+
 def change_dataset(dataset_name):
     Datasets.TARGET_DATASET = dataset_name
     update_anchors(dataset_name)
