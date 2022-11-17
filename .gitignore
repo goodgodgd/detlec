@@ -8,4 +8,4 @@ __pycache__/
 *.jpg
 data*
 result
-
+config.py
