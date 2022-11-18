@@ -36,7 +36,7 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
     model, loss_object, optimizer = create_training_parts(batch_size, imshape, ckpt_path,
                                                           learning_rate, loss_weights)
     trainer = tv.trainer_factory(train_mode, model, loss_object, train_steps, ckpt_path, optimizer)
-    validater = tv.validater_factory(train_mode, model, loss_object, ckpt_path, val_steps)
+    validater = tv.validater_factory(train_mode, model, loss_object, val_steps, ckpt_path)
 
     for epoch in range(start_epoch, end_epoch):
         print(f"========== Start dataset : {dataset_name} epoch: {epoch + 1}/{end_epoch} ==========")

@@ -91,6 +91,7 @@ class ModelEagerValidater(TrainValBase):
         self.is_train = False
 
     def run_batch(self, features):
+        features = self.fmap_generator(features)
         return self.validate_step(features)
 
     def validate_step(self, features):
@@ -104,6 +105,8 @@ class ModelGraphValidater(ModelEagerValidater):
         super().__init__(model, loss_object, epoch_steps, ckpt_path, optimizer)
 
     @tf.function
-    def run_batch(self, features):
-        return self.validate_step(features)
+    def validate_step(self, features):
+        prediction = self.model(features["image"])
+        total_loss, loss_by_type = self.loss_object(features, prediction)
+        return prediction, total_loss, loss_by_type
 

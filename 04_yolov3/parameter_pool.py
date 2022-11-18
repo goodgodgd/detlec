@@ -3,7 +3,7 @@ import numpy as np
 
 class LossComb:
     STANDARD = {"ciou": 1., "object": 1., "category": 1.}
-    SCALE_WEIGHT = {"ciou": 1., "object": [4., 2., 1.], "category": 1.}
+    SCALE_WEIGHT = {"ciou": 10., "object": [4., 2., 1.], "category": 10.}
 
 
 class Anchor:
@@ -19,7 +19,7 @@ class Anchor:
 
 class TrainingPlan:
     KITTI_SIMPLE = [
-        ("kitti", 10, 0.0001, LossComb.STANDARD, True),
-        ("kitti", 10, 0.00001, LossComb.STANDARD, True)
+        ("kitti", 10, 0.0001, LossComb.SCALE_WEIGHT, True),
+        ("kitti", 10, 0.00001, LossComb.SCALE_WEIGHT, True)
     ]
 

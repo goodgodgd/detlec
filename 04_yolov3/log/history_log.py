@@ -74,7 +74,7 @@ class HistoryLog:
             epoch_summary.update({"|": "|"})
             if op.isfile(self.history_file):
                 history = pd.read_csv(self.history_file, encoding='utf-8', converters={'epoch': lambda c: int(c)})
-                pd.concat([history, pd.DataFrame([epoch_summary])], axis=0, ignore_index=True)
+                history = pd.concat([history, pd.DataFrame([epoch_summary])], axis=0, ignore_index=True)
             else:
                 history = pd.DataFrame([epoch_summary])
         else:
