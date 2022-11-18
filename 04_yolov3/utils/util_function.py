@@ -103,6 +103,19 @@ def slice_feature(feature, channel_composition):
     return slices
 
 
+def slice_feature_np(feature, channel_composition):
+    """
+    :param feature: (batch, grid_h, grid_w, anchors, channels)
+    :param channel_composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
+    :return: {"yxhw": (batch, grid_h, grid_w, anchors, 4), "object": ..., "category": ...}
+    """
+    names, channels = list(channel_composition.keys()), list(channel_composition.values())
+    split_indices = [sum(channels[:i+1]) for i in range(len(channels)-1)]
+    slices = np.split(feature, split_indices, axis=-1)
+    slices = dict(zip(names, slices))  # slices = {'yxhw': (B,H,W,A,4), 'object': (B,H,W,A,1), ...}
+    return slices
+
+
 def merge_dim_hwa(features):
     """
     :param features: (batch, grid_h, grid_w, anchor, channels)

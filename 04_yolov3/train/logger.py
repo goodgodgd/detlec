@@ -82,7 +82,7 @@ class LogData:
 
     def compute_metric(self, grtr, pred):
         pred_inst = self.nms_box(pred["fmap"])
-        pred_inst = uf.slice_feature(pred_inst, cfg.ModelOutput.GRTR_FMAP_COMPOSITION)
+        pred_inst = uf.slice_feature_np(pred_inst, cfg.ModelOutput.GRTR_FMAP_COMPOSITION)
         counts = mt.count_true_positives(grtr["inst"], pred_inst, self.num_ctgr)
         metric = {"recall": counts["trpo"] / counts["grtr"], "precision": counts["trpo"] / counts["pred"]}
         return metric

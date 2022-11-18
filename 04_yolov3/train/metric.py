@@ -25,13 +25,13 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=cfg.NmsInfer.IOU_THRES
             "pred": (split_count["pred_tp"] + split_count["pred_fp"])}
 
 
-def split_tp_fp_fn(pred, grtr, iou_thresh):
+def split_tp_fp_fn(grtr, pred, iou_thresh):
     batch, M, _ = pred["category"].shape
     valid_mask = grtr["object"]
     iou = uf.compute_iou_general(grtr["yxhw"], pred["yxhw"])  # (batch, N, M)
     best_iou = np.max(iou, axis=-1)  # (batch, N)
     best_idx = np.argmax(iou, axis=-1)  # (batch, N)
-    
+
     if len(iou_thresh) > 1:
         iou_thresh = get_iou_thresh_per_class(grtr["category"], iou_thresh)
     iou_match = best_iou > iou_thresh  # (batch, N)
@@ -66,7 +66,7 @@ def get_iou_thresh_per_class(grtr_ctgr, iou_thresh):
     :param iou_thresh: (num_ctgr)
     :return: 
     """
-    ctgr_idx = grtr_ctgr.astype(np.int32)
+    ctgr_idx = grtr_ctgr.astype(np.int32)[..., 0]                       # (batch, N)
     iou_thresh = np.asarray(iou_thresh, np.float32)[np.newaxis, ...]    # (1, num_ctgr)
     iou_thresh = np.take_along_axis(iou_thresh, ctgr_idx, axis=1)       # (batch, N)
     return iou_thresh
