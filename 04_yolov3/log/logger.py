@@ -3,7 +3,7 @@ import os
 import os.path as op
 
 from log.history_log import HistoryLog
-# from log.visual_log import VisualLog
+from log.visual_log import VisualLog
 import utils.util_function as uf
 import model.model_util as mu
 import config as cfg
@@ -12,7 +12,7 @@ import config as cfg
 class Logger:
     def __init__(self, epoch: int, ckpt_path: str, visual_log: bool, is_train: bool):
         self.history_logger = HistoryLog(epoch, ckpt_path, is_train)
-        # self.visual_logger = VisualLog(epoch, ckpt_path) if visual_log else None
+        self.visual_logger = VisualLog(epoch, ckpt_path) if visual_log else None
         self.nms_box = mu.NonMaximumSuppressionBox()
         self.num_ctgr = len(cfg.Tfrdata.CATEGORY_NAMES)
         self.epoch = epoch
@@ -36,8 +36,8 @@ class Logger:
             self.save_data_structure(structure)
         
         self.history_logger(step, grtr, pred, total_loss, loss_by_type)
-        # if self.visual_logger:
-        #    self.visual_logger(step, grtr, pred)
+        if self.visual_logger:
+            self.visual_logger(step, grtr, pred)
 
     def check_scales(self, title, data, key=""):
         div_count = 0
