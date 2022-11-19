@@ -41,7 +41,7 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
     for epoch in range(start_epoch, end_epoch):
         print(f"========== Start dataset : {dataset_name} epoch: {epoch + 1}/{end_epoch} ==========")
         trainer.run_epoch(dataset_train, epoch, False)
-        validater.run_epoch(dataset_val, epoch, (epoch==0 or epoch==end_epoch-1))
+        validater.run_epoch(dataset_val, epoch, epoch%5==0 or epoch%5==4)
         save_model_ckpt(ckpt_path, model)
 
     if model_save:

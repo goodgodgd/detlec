@@ -20,15 +20,7 @@ def count_true_positives(grtr, pred, num_ctgr, iou_thresh=cfg.ModelOutput.TP_IOU
         else:
             split_count[split_key] = np.sum(split_mask)
 
-    grtr_cnt = np.sum(grtr["yxhw"][..., 2:3] > 0)
-    pred_cnt = np.sum(pred["yxhw"][..., 2:3] > 0)
-    assert grtr_cnt == (split_count["grtr_tp"] + split_count["grtr_fn"])
-    assert pred_cnt == (split_count["pred_tp"] + split_count["pred_fp"])
-    if split_count["grtr_tp"] != split_count["pred_tp"]:
-        print("!!ERR!!", grtr_cnt, pred_cnt, split_count)
-    # assert split_count["grtr_tp"] == split_count["pred_tp"]
-
-    return {"trpo": split_count["grtr_tp"],
+    return {"trpo": np.minimum(split_count["grtr_tp"], split_count["pred_tp"]),
             "grtr": (split_count["grtr_tp"] + split_count["grtr_fn"]),
             "pred": (split_count["pred_tp"] + split_count["pred_fp"])}
 
@@ -58,38 +50,12 @@ def split_tp_fp_fn(grtr, pred, iou_thresh):
     pred_fp_mask = 1 - pred_tp_mask  # (batch, M, 1)
     pred_tp = {key: val * pred_tp_mask for key, val in pred.items()}
     pred_fp = {key: val * pred_fp_mask for key, val in pred.items()}
-
-    # _best_iou__ = best_iou[0]
-    # _best_idx__ = best_idx[0]
-    # _grtr_ctgr__ = grtr["category"][0, :, 0]
-    # _pred_ctgr__ = pred["category"][0, :, 0]
-    # _iou_match__ = iou_match[0]
-    # _ctgr_match__ = ctgr_match[0]
-    # _grtr_tp_mask__ = grtr_tp_mask[0, :, 0]
-    # _grtr_fn_mask__ = grtr_fn_mask[0, :, 0]
-    # _pred_tp_mask__ = pred_tp_mask[0, :, 0]
-    # _grtr_height__ = grtr["yxhw"][0, :, 2]
-    # _pred_height__ = pred["yxhw"][0, :, 2]
-    # __sum_result = {"grtr_sum": np.sum(_grtr_height__ > 0),
-    #                 "pred_sum": np.sum(_pred_height__ > 0),
-    #                 "grtr_tp_sum": np.sum(grtr_tp["yxhw"][0,:,0] > 0),
-    #                 "grtr_fn_sum": np.sum(grtr_fn["yxhw"][0,:,0] > 0),
-    #                 "pred_tp_sum": np.sum(pred_tp["yxhw"][0, :, 0] > 0),
-    #                 "pred_fp_sum": np.sum(pred_fp["yxhw"][0, :, 0] > 0),
-    #                 }
-
     return {"pred_tp": pred_tp, "pred_fp": pred_fp, "grtr_tp": grtr_tp, "grtr_fn": grtr_fn}
 
 
 def indices_to_binary_mask(best_idx, valid_mask, depth):
     best_idx_onehot = one_hot(best_idx, depth) * valid_mask  # (batch, M, N) * (batch, M, 1)
     binary_mask = np.expand_dims(np.max(best_idx_onehot, axis=1), axis=-1)  # (batch, M, 1)
-    sum_mask = np.expand_dims(np.sum(best_idx_onehot, axis=1), axis=-1)  # (batch, M, 1)
-    bin_sum = np.sum(binary_mask)
-    sum_sum = np.sum(sum_mask)
-    if bin_sum != sum_sum:
-        print("!!ERR trpo overlap", bin_sum, sum_sum)
-
     return binary_mask.astype(np.float32)
 
 
