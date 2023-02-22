@@ -6,5 +6,6 @@ __pycache__/
 .python-version
 *.png
 *.jpg
+data*
 result
 config.py
