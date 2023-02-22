@@ -1,11 +1,11 @@
 import os.path as op
 import json
 import tensorflow as tf
-import cv2
 
 import settings
 import config as cfg
-import utils.util_function as uf
+import neutr.utils.util_function as nuf
+import tflow.utils.util_function as tuf
 
 
 class TfrecordReader:
@@ -58,7 +58,7 @@ class TfrecordReader:
                 decoded[key] = tf.io.decode_raw(parsed[key], properties["decode_type"])
                 decoded[key] = tf.reshape(decoded[key], shape=properties["shape"])
         # uint8 image -> image float (-1 ~ 1)
-        decoded["image"] = uf.to_float_image(decoded["image"])
+        decoded["image"] = tuf.to_float_image(decoded["image"])
         return decoded
 
     def dataset_process(self, dataset):
@@ -78,8 +78,7 @@ class TfrecordReader:
 
 
 # ==================================================
-import numpy as np
-import tfrecord.tfr_util as tu
+import cv2
 
 
 def test_read_dataset():
@@ -87,10 +86,10 @@ def test_read_dataset():
     dataset = TfrecordReader(op.join(cfg.Paths.TFRECORD, "kitti_train"), batch_size=4).get_dataset()
     for i, x in enumerate(dataset):
         print(f"=== index: {i}, image={x['image'].shape}, bbox={x['inst'].shape}")
-        image = uf.to_uint8_image(x['image'])
+        image = tuf.to_uint8_image(x['image'])
         image = image[0].numpy()
         bboxes = x["inst"][0].numpy()
-        image = tu.draw_boxes(image, bboxes, cfg.Tfrdata.CATEGORY_NAMES)
+        image = nuf.draw_boxes(image, bboxes, cfg.Tfrdata.CATEGORY_NAMES)
         cv2.imshow("image with boxes", image)
         key = cv2.waitKey()
         if key == ord('q'):

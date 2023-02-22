@@ -1,24 +1,20 @@
-import tensorflow as tf
-
-import train.loss_pool as loss
-import utils.util_function as uf
 import config as cfg
 
 
 class IntegratedLoss:
-    def __init__(self, loss_weights):
+    def __init__(self, loss_weights, pool_module):
         self.loss_weights = loss_weights
-        self.loss_objects = self.create_loss_objects(loss_weights)
+        self.loss_objects = self.create_loss_objects(loss_weights, pool_module)
         self.num_scale = len(cfg.ModelOutput.FEATURE_SCALES)
 
-    def create_loss_objects(self, loss_weights):
+    def create_loss_objects(self, loss_weights, pool_module):
         loss_objects = dict()
         if "ciou" in loss_weights:
-            loss_objects["ciou"] = loss.CiouLoss()
+            loss_objects["ciou"] = pool_module.CiouLoss()
         if "object" in loss_weights:
-            loss_objects["object"] = loss.ObjectnessLoss()
+            loss_objects["object"] = pool_module.ObjectnessLoss()
         if "category" in loss_weights:
-            loss_objects["category"] = loss.CategoryLoss(len(cfg.Tfrdata.CATEGORY_NAMES))
+            loss_objects["category"] = pool_module.CategoryLoss(len(cfg.Tfrdata.CATEGORY_NAMES))
         return loss_objects
 
     def __call__(self, features, predictions):

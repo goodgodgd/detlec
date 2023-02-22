@@ -19,14 +19,6 @@ def set_gpu_configs():
             print(e)
 
 
-def print_progress(status_msg):
-    # NOTE: the \r which means the line should overwrite itself.
-    msg = "\r" + status_msg
-    # Print it.
-    sys.stdout.write(msg)
-    sys.stdout.flush()
-
-
 def to_float_image(im_tensor):
     return tf.image.convert_image_dtype(im_tensor, dtype=tf.float32)
 
@@ -103,19 +95,6 @@ def slice_feature(feature, channel_composition):
     return slices
 
 
-def slice_feature_np(feature, channel_composition):
-    """
-    :param feature: (batch, grid_h, grid_w, anchors, channels)
-    :param channel_composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
-    :return: {"yxhw": (batch, grid_h, grid_w, anchors, 4), "object": ..., "category": ...}
-    """
-    names, channels = list(channel_composition.keys()), list(channel_composition.values())
-    split_indices = [sum(channels[:i+1]) for i in range(len(channels)-1)]
-    slices = np.split(feature, split_indices, axis=-1)
-    slices = dict(zip(names, slices))  # slices = {'yxhw': (B,H,W,A,4), 'object': (B,H,W,A,1), ...}
-    return slices
-
-
 def merge_dim_hwa(features):
     """
     :param features: (batch, grid_h, grid_w, anchor, channels)
@@ -159,29 +138,16 @@ def compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):
     return iou
 
 
-def compute_iou_general(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):
-    """
-    :param grtr_yxhw: GT bounding boxes in yxhw format (batch, N1, D1(>4))
-    :param pred_yxhw: predicted bounding box in yxhw format (batch, N2, D2(>4))
-    :return: iou (batch, N1, N2)
-    """
-    grtr_yxhw = np.expand_dims(grtr_yxhw, axis=-2)  # (batch, N1, 1, D1)
-    pred_yxhw = np.expand_dims(pred_yxhw, axis=-3)  # (batch, 1, N2, D2)
-    if grtr_tlbr is None:
-        grtr_tlbr = convert_box_format_yxhw_to_tlbr(grtr_yxhw)  # (batch, N1, 1, D1)
-    if pred_tlbr is None:
-        pred_tlbr = convert_box_format_yxhw_to_tlbr(pred_yxhw)  # (batch, 1, N2, D2)
-
-    inter_tl = np.maximum(grtr_tlbr[..., :2], pred_tlbr[..., :2])  # (batch, N1, N2, 2)
-    inter_br = np.minimum(grtr_tlbr[..., 2:4], pred_tlbr[..., 2:4])  # (batch, N1, N2, 2)
-    inter_hw = inter_br - inter_tl  # (batch, N1, N2, 2)
-    inter_hw = np.maximum(inter_hw, 0)
-    inter_area = inter_hw[..., 0] * inter_hw[..., 1]  # (batch, N1, N2)
-
-    pred_area = pred_yxhw[..., 2] * pred_yxhw[..., 3]  # (batch, 1, N2)
-    grtr_area = grtr_yxhw[..., 2] * grtr_yxhw[..., 3]  # (batch, N1, 1)
-    iou = inter_area / (pred_area + grtr_area - inter_area + 1e-5)  # (batch, N1, N2)
-    return iou
+def convert_to_numpy(data):
+    if isinstance(data, list):
+        for i, datum in enumerate(data):
+            data[i] = convert_to_numpy(datum)
+    elif isinstance(data, dict):
+        for key, datum in data.items():
+            data[key] = convert_to_numpy(datum)
+    elif tf.is_tensor(data):
+        return data.numpy()
+    return data
 
 
 def print_structure(title, data, key=""):
@@ -200,19 +166,6 @@ def print_structure(title, data, key=""):
         print(title, key, data.shape, "tf", data.dtype)
     else:
         print(title, key, data)
-
-
-def convert_to_numpy(data):
-    if isinstance(data, list):
-        for i, datum in enumerate(data):
-            data[i] = convert_to_numpy(datum)
-    elif isinstance(data, dict):
-        for key, datum in data.items():
-            data[key] = convert_to_numpy(datum)
-    elif tf.is_tensor(data):
-        return data.numpy()
-    return data
-
 
 
 

@@ -9,15 +9,15 @@ import shutil
 import cv2
 from timeit import default_timer as timer
 
-import utils.util_class as uc
-import utils.util_function as uf
-from tfrecord.example_maker import ExampleMaker
-import tfrecord.tfr_util as tu
+import neutr.utils.util_class as nuc
+import neutr.utils.util_function as nuf
+from neutr.data.example_maker import ExampleMaker
+import tflow.tfrecord.tfr_util as tu
 
 
 def drive_manager_factory(dataset_name, split, srcpath):
     if dataset_name == "kitti":
-        from tfrecord.readers.kitti_reader import KittiDriveManager
+        from neutr.data.readers.kitti_reader import KittiDriveManager
         return KittiDriveManager(srcpath, split)
     else:
         assert 0, f"[drive_manager_factory] invalid dataset name: {dataset_name}"
@@ -25,7 +25,7 @@ def drive_manager_factory(dataset_name, split, srcpath):
 
 def drive_reader_factory(dataset_cfg, split, drive_path):
     if dataset_cfg.NAME == "kitti":
-        from tfrecord.readers.kitti_reader import KittiReader
+        from neutr.data.readers.kitti_reader import KittiReader
         return KittiReader(drive_path, split, dataset_cfg)
     else:
         assert 0, f"[drive_reader_factory] invalid dataset name: {dataset_cfg.NAME}"
@@ -58,12 +58,12 @@ class TfrecordMaker:
         self.drive_manger = drive_manager_factory(dataset_cfg.NAME, split, dataset_cfg.PATH)
         self.serializer = tu.TfrSerializer()
         self.writer = None
-        self.path_manager = uc.PathManager([""])
+        self.path_manager = nuc.PathManager([""])
 
     def make(self):
         print("\n\n========== Start dataset:", self.dataset_cfg.NAME)
         drive_paths = self.drive_manger.get_drive_paths()
-        with uc.PathManager(self.tfrpath__, closer_func=self.on_exit) as path_manager:
+        with nuc.PathManager(self.tfrpath__, closer_func=self.on_exit) as path_manager:
             self.path_manager = path_manager
             for self.drive_index, drive_path in enumerate(drive_paths):
                 print(f"\n==== Start drive-{self.drive_index}:", drive_path)
@@ -122,13 +122,13 @@ class TfrecordMaker:
             except StopIteration as si:     # raised from next()
                 print("\n==[write_drive][StopIteration] stop this drive\n", si)
                 break
-            except uc.MyExceptionToCatch as me:  # raised from xxx_reader._get_frame()
-                uf.print_progress(f"\n==[write_drive][MyException] {index}/{num_drive_frames}, {me}\n")
+            except nuc.MyExceptionToCatch as me:  # raised from xxx_reader._get_frame()
+                nuf.print_progress(f"\n==[write_drive][MyException] {index}/{num_drive_frames}, {me}\n")
                 continue
 
             serialized_example = self.serializer(example)
             self.write_example(serialized_example)
-            uf.print_progress(f"==[write_drive]: shard: {self.shard_index}/{self.shard_example_count}/{self.shard_size} | "
+            nuf.print_progress(f"==[write_drive]: shard: {self.shard_index}/{self.shard_example_count}/{self.shard_size} | "
                               f"drive: {self.drive_example_count}/{index}/{num_drive_frames} | "
                               f"total: {self.total_example_count} | time: {timer() - time1:1.4f}")
         print("")
@@ -136,7 +136,7 @@ class TfrecordMaker:
 
     def verify_example(self, drive_example, example):
         if (not example) or ("image" not in example):
-            raise uc.MyExceptionToCatch(f"[verify_example] EMPTY example")
+            raise nuc.MyExceptionToCatch(f"[verify_example] EMPTY example")
         # initialize drive example (representative sample among drive examples)
         if not drive_example:
             drive_example = copy.deepcopy(example)
@@ -147,7 +147,7 @@ class TfrecordMaker:
         if list(drive_example.keys()) != list(example.keys()):
             self.error_count += 1
             assert self.error_count < 10, "too frequent errors"
-            raise uc.MyExceptionToCatch(f"[verify_example] error count: {self.error_count}, different keys:\n"
+            raise nuc.MyExceptionToCatch(f"[verify_example] error count: {self.error_count}, different keys:\n"
                                         f"{list(drive_example.keys())} != {list(example.keys())}")
         # check shape change
         for key in drive_example:
@@ -156,7 +156,7 @@ class TfrecordMaker:
             if drive_example[key].shape != example[key].shape:
                 self.error_count += 1
                 assert self.error_count < 10, "too frequent errors"
-                raise uc.MyExceptionToCatch(f"[verify_example] error count: {self.error_count}, "
+                raise nuc.MyExceptionToCatch(f"[verify_example] error count: {self.error_count}, "
                       f"different shape of {key}: {drive_example[key].shape} != {example[key].shape}")
         return drive_example
 

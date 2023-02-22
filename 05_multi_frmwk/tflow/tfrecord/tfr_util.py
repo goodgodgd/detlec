@@ -1,8 +1,5 @@
 import numpy as np
-import cv2
 import tensorflow as tf
-
-import utils.util_function as uf
 
 
 class TfrSerializer:
@@ -88,29 +85,3 @@ def read_data_config(key, value):
         assert 0, f"[read_data_config] Wrong type: {type(value)}, key={key}"
 
     return {"parse_type": parse_type, "decode_type": decode_type, "shape": shape}
-
-
-def draw_boxes(image, bboxes, category_names, box_format="yxhw"):
-    """
-    :param image: (height, width, 3), np.uint8
-    :param bboxes: (N, 6), np.float32 (0~1) or np.int32 (pixel scale)
-    :param category_names: list of category names
-    :param box_format: "yxhw": [y, x, h, w, category] or "2pt": [y1, x1, y2, x2, category]
-    """
-    image = image.copy()
-    bboxes = bboxes.copy()
-    if np.max(bboxes[:, :4]) <= 1:
-        height, width = image.shape[:2]
-        bboxes[:, :4] *= np.array([[height, width, height, width]], np.float32)
-    if box_format == "yxhw":
-        bboxes = uf.convert_box_format_yxhw_to_tlbr(bboxes)
-    bboxes = bboxes[bboxes[:, 2] > 0, :]
-    bboxes = bboxes.astype(np.int32)
-
-    for i, bbox in enumerate(bboxes):
-        pt1, pt2 = (bbox[1], bbox[0]), (bbox[3], bbox[2])
-        cat_index = int(bbox[5])
-        category = category_names[cat_index]
-        image = cv2.rectangle(image, pt1, pt2, (255, 0, 0), thickness=2)
-        image = cv2.putText(image, f"{i}{category}", pt1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-    return image

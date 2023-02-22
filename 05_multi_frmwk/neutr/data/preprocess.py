@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 
-import utils.util_class as uc
-import utils.util_function as uf
+import neutr.utils.util_class as nuc
+import neutr.utils.util_function as nuf
 
 
 class PreprocessBase:
@@ -80,14 +80,14 @@ class ExampleCropper(PreprocessBase):
                  (bboxes[:, 1] >= 0) & (bboxes[:, 1] < crop_hw[1])
         bboxes = bboxes[inside]
         if bboxes.size == 0:
-            raise uc.MyExceptionToCatch("[get_bboxes] empty boxes")
+            raise nuc.MyExceptionToCatch("[get_bboxes] empty boxes")
         # clip into image range
-        bboxes = uf.convert_box_format_yxhw_to_tlbr(bboxes)
+        bboxes = nuf.convert_box_format_yxhw_to_tlbr(bboxes)
         bboxes[:, 0] = np.maximum(bboxes[:, 0], 0)
         bboxes[:, 1] = np.maximum(bboxes[:, 1], 0)
         bboxes[:, 2] = np.minimum(bboxes[:, 2], crop_hw[0])
         bboxes[:, 3] = np.minimum(bboxes[:, 3], crop_hw[1])
-        bboxes = uf.convert_box_format_tlbr_to_yxhw(bboxes)
+        bboxes = nuf.convert_box_format_tlbr_to_yxhw(bboxes)
         return bboxes
 
 

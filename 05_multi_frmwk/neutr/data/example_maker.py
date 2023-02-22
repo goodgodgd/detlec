@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 
-import tfrecord.tfr_util as tu
-import tfrecord.preprocess as pr
+import neutr.utils.util_function as nuf
+import neutr.data.preprocess as pr
 import config as cfg
 
 
@@ -33,7 +33,7 @@ class ExampleMaker:
 
     def show_example(self, example):
         category_names = cfg.Tfrdata.CATEGORY_NAMES
-        image = tu.draw_boxes(example["image"], example["inst"], category_names)
+        image = nuf.draw_boxes(example["image"], example["inst"], category_names)
         cv2.imshow("image with bboxes", image)
         cv2.waitKey(100)
 

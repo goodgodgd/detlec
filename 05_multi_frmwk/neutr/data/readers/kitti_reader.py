@@ -3,9 +3,9 @@ import numpy as np
 from glob import glob
 import cv2
 
-from tfrecord.readers.reader_base import DatasetReaderBase, DriveManagerBase
-import tfrecord.tfr_util as tu
-import utils.util_class as uc
+from neutr.data.readers.reader_base import DatasetReaderBase, DriveManagerBase
+import neutr.utils.util_function as nuf
+import neutr.utils.util_class as uc
 
 
 class KittiDriveManager(DriveManagerBase):
@@ -96,7 +96,7 @@ def test_kitti_reader():
         image = reader.get_image(i)
         bboxes = reader.get_bboxes(i)
         print(f"frame {i}, bboxes:\n", bboxes)
-        boxed_image = tu.draw_boxes(image, bboxes, dataset_cfg.CATEGORIES_TO_USE)
+        boxed_image = nuf.draw_boxes(image, bboxes, dataset_cfg.CATEGORIES_TO_USE)
         cv2.imshow("kitti", boxed_image)
         key = cv2.waitKey()
         if key == ord('q'):
