@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 import tensorflow_addons as tfa
 
-import utils.util_function as uf
+import tflow.utils.util_function as tuf
 import config as cfg
 
 
@@ -56,7 +56,7 @@ class NonMaximumSuppressionBox:
         :return: (batch, max_out, 6), 6: bbox, score, category
         """
         pred = {key: tf.concat(data, axis=1) for key, data in pred.items() if isinstance(data, list) and not key.endswith("_logit")}
-        boxes = uf.convert_box_format_yxhw_to_tlbr(pred["yxhw"])  # (batch, N, 4)
+        boxes = tuf.convert_box_format_yxhw_to_tlbr(pred["yxhw"])  # (batch, N, 4)
         categories = tf.argmax(pred["category"], axis=-1)  # (batch, N)
         best_probs = tf.reduce_max(pred["category"], axis=-1)  # (batch, N)
         objectness = pred["object"][..., 0]  # (batch, N)
@@ -69,6 +69,7 @@ class NonMaximumSuppressionBox:
             ctgr_boxes = boxes * ctgr_mask[..., tf.newaxis]  # (batch, N, 4)
             ctgr_scores = scores * ctgr_mask  # (batch, N)
 
+            # TODO: use non_max_suppression_padded(), it processes a batch at ONCE
             for frame_idx in range(batch):
                 selected_indices = tf.image.non_max_suppression(
                     boxes=ctgr_boxes[frame_idx],

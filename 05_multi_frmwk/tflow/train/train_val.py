@@ -1,10 +1,10 @@
 import tensorflow as tf
-import numpy as np
 from timeit import default_timer as timer
 
-import utils.util_function as uf
-from log.logger import Logger
-from train.fmap_generator import SinglePositivePolicy
+import neutr.utils.util_function as nuf
+import tflow.utils.util_function as tuf
+from neutr.log.logger import Logger
+from tflow.train.fmap_generator import SinglePositivePolicy
 
 
 def trainer_factory(mode, model, loss_object, steps, ckpt_path, optimizer):
@@ -32,12 +32,12 @@ class TrainValBase:
         self.is_train = True
 
     def run_epoch(self, dataset, epoch: int, visual_log: bool):
-        logger = Logger(epoch, self.ckpt_path, visual_log, self.is_train)
+        logger = Logger(epoch, self.ckpt_path, visual_log, self.is_train, tuf.convert_to_numpy)
         for step, features in enumerate(dataset):
             start = timer()
             prediction, total_loss, loss_by_type = self.run_batch(features)
             logger.log_batch_result(step, features, prediction, total_loss, loss_by_type)
-            uf.print_progress(f"training {step}/{self.epoch_steps} steps, "
+            nuf.print_progress(f"training {step}/{self.epoch_steps} steps, "
                               f"time={timer() - start:.3f}, "
                               f"loss={total_loss:.3f}, ")
             # if step > 20:

@@ -1,10 +1,10 @@
 import tensorflow as tf
-import model.backbone as back
-import model.head as head
-import utils.util_function as uf
+import tflow.model.backbone as back
+import tflow.model.head as head
+import tflow.utils.util_function as uf
 
 import config as cfg
-import model.model_util as mu
+import tflow.model.model_util as mu
 
 
 class ModelFactory:

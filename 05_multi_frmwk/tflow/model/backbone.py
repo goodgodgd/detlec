@@ -1,5 +1,5 @@
-from utils.util_class import MyExceptionToCatch
-import model.model_util as mu
+from neutr.utils.util_class import MyExceptionToCatch
+import tflow.model.model_util as mu
 
 
 def backbone_factory(backbone, conv_kwargs):

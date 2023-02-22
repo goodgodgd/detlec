@@ -4,8 +4,8 @@ import numpy as np
 import cv2
 
 import config as cfg
-from log.metric import split_tp_fp_fn
-import utils.util_function as uf
+from neutr.log.metric import split_tp_fp_fn
+import neutr.utils.util_function as uf
 
 
 class VisualLog:

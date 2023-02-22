@@ -1,9 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
-from utils.util_class import MyExceptionToCatch
-import model.model_util as mu
-import utils.util_function as uf
+from neutr.utils.util_class import MyExceptionToCatch
+import tflow.model.model_util as mu
 
 
 def head_factory(head, conv_args, num_anchors_per_scale, out_channels):

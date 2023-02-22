@@ -6,11 +6,12 @@ import pandas as pd
 
 import settings
 import config as cfg
-from tfrecord.tfrecord_reader import TfrecordReader
-from model.model_factory import ModelFactory
-from train.loss_factory import IntegratedLoss
-import train.train_val as tv
-import utils.util_function as uf
+from tflow.tfrecord.tfrecord_reader import TfrecordReader
+from tflow.model.model_factory import ModelFactory
+from neutr.loss_factory import IntegratedLoss
+import tflow.train.train_val as tv
+import tflow.utils.util_function as uf
+import tflow.train.loss_pool as loss_pool
 
 
 def train_main():
@@ -63,7 +64,7 @@ def create_training_parts(batch_size, imshape, ckpt_path, learning_rate,
                           loss_weights, weight_suffix='latest'):
     model = ModelFactory(batch_size, imshape).get_model()
     model = try_load_weights(ckpt_path, model, weight_suffix)
-    loss_object = IntegratedLoss(loss_weights)
+    loss_object = IntegratedLoss(loss_weights, loss_pool)
     optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
     return model, loss_object, optimizer
 

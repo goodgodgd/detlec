@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 import config as cfg
-import utils.util_function as uf
+import tflow.utils.util_function as tuf
 
 
 class SinglePositivePolicy:
@@ -21,7 +21,7 @@ class SinglePositivePolicy:
         imshape = features["image"].shape[1:3]
         feat_shapes = [np.array(imshape) // scale for scale in self.feat_scales]
         new_inst = {"whole": features["inst"]}
-        new_inst.update(uf.slice_feature(features["inst"], self.grtr_compos))
+        new_inst.update(tuf.slice_feature(features["inst"], self.grtr_compos))
         # channel = 0
         # for key, depth in self.grtr_compos.items():
         #     new_inst[key] = features["inst"][:, channel:channel+depth]
@@ -49,7 +49,7 @@ class SinglePositivePolicy:
                 assert tf.reduce_all(grid_yx >= 0) and tf.reduce_all(grid_yx < feat_shapes[scale_index])
                 feat_map[scale_index][batch, grid_yx[0], grid_yx[1], anchor_index_in_scale] = inst
 
-        feat_slices = uf.slice_features_and_merge_dims(feat_map, self.grtr_compos)
+        feat_slices = tuf.slice_features_and_merge_dims(feat_map, self.grtr_compos)
         feat_map = {"whole": feat_map}
         feat_map.update(feat_slices)
         features["inst"] = new_inst

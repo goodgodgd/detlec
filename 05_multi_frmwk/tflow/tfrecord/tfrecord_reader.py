@@ -4,7 +4,6 @@ import tensorflow as tf
 
 import settings
 import config as cfg
-import neutr.utils.util_function as nuf
 import tflow.utils.util_function as tuf
 
 
@@ -79,6 +78,7 @@ class TfrecordReader:
 
 # ==================================================
 import cv2
+import neutr.utils.util_function as nuf
 
 
 def test_read_dataset():

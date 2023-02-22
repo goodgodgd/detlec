@@ -1,5 +1,5 @@
 import numpy as np
-import utils.util_function as uf
+import neutr.utils.util_function as uf
 import config as cfg
 
 

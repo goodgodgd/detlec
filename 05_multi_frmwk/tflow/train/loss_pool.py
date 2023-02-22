@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-import utils.util_function as uf
+import tflow.utils.util_function as tuf
 
 
 class LossBase:
@@ -31,10 +31,10 @@ class CiouLoss(LossBase):
         :param pred_yxhw: (batch, HWA, 4)
         :return: ciou loss (batch, HWA)
         """
-        grtr_tlbr = uf.convert_box_format_yxhw_to_tlbr(grtr_yxhw)
-        pred_tlbr = uf.convert_box_format_yxhw_to_tlbr(pred_yxhw)
+        grtr_tlbr = tuf.convert_box_format_yxhw_to_tlbr(grtr_yxhw)
+        pred_tlbr = tuf.convert_box_format_yxhw_to_tlbr(pred_yxhw)
         # iou: (batch, HWA)
-        iou = uf.compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr, pred_tlbr)
+        iou = tuf.compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr, pred_tlbr)
         cbox_tl = tf.minimum(grtr_tlbr[..., :2], pred_tlbr[..., :2])
         cbox_br = tf.maximum(grtr_tlbr[..., 2:], pred_tlbr[..., 2:])
         cbox_hw = cbox_br - cbox_tl

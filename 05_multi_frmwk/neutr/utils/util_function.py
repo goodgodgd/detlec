@@ -47,7 +47,7 @@ def concat_box_output(output, boxes):
     return output
 
 
-def slice_feature_np(feature, channel_composition):
+def slice_feature(feature, channel_composition):
     """
     :param feature: (batch, grid_h, grid_w, anchors, channels)
     :param channel_composition: e.g. {"yxhw": 4, "object": 1, "category": 1}

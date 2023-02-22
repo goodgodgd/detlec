@@ -2,34 +2,35 @@ import numpy as np
 import os
 import os.path as op
 
-from log.history_log import HistoryLog
-from log.visual_log import VisualLog
-import utils.util_function as uf
-import model.model_util as mu
+from neutr.log.history_log import HistoryLog
+from neutr.log.visual_log import VisualLog
+import neutr.utils.util_function as uf
+import tflow.model.model_util as mu
 import config as cfg
 
 
 class Logger:
-    def __init__(self, epoch: int, ckpt_path: str, visual_log: bool, is_train: bool):
+    def __init__(self, epoch: int, ckpt_path: str, visual_log: bool, is_train: bool, convert_to_numpy):
         self.history_logger = HistoryLog(epoch, ckpt_path, is_train)
         self.visual_logger = VisualLog(epoch, ckpt_path) if visual_log else None
         self.nms_box = mu.NonMaximumSuppressionBox()
         self.num_ctgr = len(cfg.Tfrdata.CATEGORY_NAMES)
         self.epoch = epoch
         self.ckpt_path = ckpt_path
+        self.convert_to_numpy = convert_to_numpy
         assert op.isdir(op.dirname(op.dirname(ckpt_path)))
         os.makedirs(ckpt_path, exist_ok=True)
 
     def log_batch_result(self, step, grtr, pred, total_loss, loss_by_type):
-        grtr = uf.convert_to_numpy(grtr)
-        pred = uf.convert_to_numpy(pred)
-        loss_by_type = uf.convert_to_numpy(loss_by_type)
+        grtr = self.convert_to_numpy(grtr)
+        pred = self.convert_to_numpy(pred)
+        loss_by_type = self.convert_to_numpy(loss_by_type)
         total_loss = total_loss.numpy()
         assert self.check_scales("[pred scale]", pred) == 0
         assert self.check_scales("[loss scale]", loss_by_type) == 0
 
         pred_inst = self.nms_box(pred["fmap"])
-        pred["inst"] = uf.slice_feature_np(pred_inst, cfg.ModelOutput.GRTR_FMAP_COMPOSITION)
+        pred["inst"] = uf.slice_feature(pred_inst, cfg.ModelOutput.GRTR_FMAP_COMPOSITION)
 
         if step == 0 and self.epoch == 0:
             structure = {"grtr": grtr, "pred": pred, "loss": loss_by_type}

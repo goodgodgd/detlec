@@ -59,12 +59,8 @@ def concat_box_output(output, boxes):
         auxi_data = boxes[..., 4:]
         output.append(auxi_data)
 
-    if tf.is_tensor(boxes):
-        output = tf.concat(output, axis=-1)
-        output = tf.cast(output, boxes.dtype)
-    else:
-        output = np.concatenate(output, axis=-1)
-        output = output.astype(boxes.dtype)
+    output = tf.concat(output, axis=-1)
+    output = tf.cast(output, boxes.dtype)
     return output
 
 

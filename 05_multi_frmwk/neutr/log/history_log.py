@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 from timeit import default_timer as timer
 
-import utils.util_function as uf
-import model.model_util as mu
-import log.metric as mt
+import neutr.utils.util_function as uf
+import tflow.model.model_util as mu
+import neutr.log.metric as mt
 import config as cfg
 
 
