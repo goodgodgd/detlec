@@ -95,8 +95,10 @@ def test_kitti_reader():
     for i in range(reader.num_frames()):
         image = reader.get_image(i)
         bboxes = reader.get_bboxes(i)
-        print(f"frame {i}, bboxes:\n", bboxes)
-        boxed_image = nuf.draw_boxes(image, bboxes, dataset_cfg.CATEGORIES_TO_USE)
+        ctgrs = reader.get_categories(i)
+        inst = np.concatenate([bboxes, np.ones_like(ctgrs), ctgrs], axis=1)
+        print(f"frame {i}, instances:\n", inst)
+        boxed_image = nuf.draw_boxes(image, inst, dataset_cfg.CATEGORIES_TO_USE)
         cv2.imshow("kitti", boxed_image)
         key = cv2.waitKey()
         if key == ord('q'):

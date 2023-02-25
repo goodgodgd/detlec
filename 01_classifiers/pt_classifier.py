@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from timeit import default_timer as timer
 
 
-"""
+""" 
 Common utils
 """
 class DurationTime:

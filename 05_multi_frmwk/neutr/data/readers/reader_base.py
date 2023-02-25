@@ -19,6 +19,9 @@ class DatasetReaderBase:
         self.frame_names = self.init_drive(drive_path, split)
         self.dataset_cfg = dataset_cfg
 
+    def __len__(self):
+        return len(self.frame_names)
+
     def init_drive(self, drive_path, split):
         """
         :param drive_path: path to the specific drive folder
