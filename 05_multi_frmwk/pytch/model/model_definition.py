@@ -18,13 +18,12 @@ class ModuleParts:
     @staticmethod
     def get_resblock(block_name, src_name, in_channels):
         module = {
-            'conv1': {'type': 'conv2d', 'input': None, 'out_channels': in_channels // 2, 'kernel_size': 3, 'activation': 'relu'},
+            'conv1': {'type': 'conv2d', 'input': 'src', 'out_channels': in_channels // 2, 'kernel_size': 3, 'activation': 'relu'},
             'conv2': {'type': 'conv2d', 'input': 'conv1', 'out_channels': in_channels, 'kernel_size': 3, 'activation': 'relu'},
-            'add': {'type': 'add', 'input': [None, 'conv2']},
+            'add': {'type': 'add', 'input': ['src', 'conv2']},
         }
         module = ModuleParts.append_block_name(block_name, module)
-        module[block_name + '/' + 'conv1']['input'] = src_name
-        module[block_name + '/' + 'add']['input'][0] = src_name
+        module = ModuleParts.replace_input_name(module, {'src': src_name})
         return module
 
     @staticmethod
@@ -32,25 +31,29 @@ class ModuleParts:
         new_block_module = {}
         for sub_name, sub_module in block_module.items():
             sub_input = sub_module['input']
-            if sub_input is None:
-                pass
-            elif isinstance(sub_input, list):   # when input is a list of strs
+            if isinstance(sub_input, list):   # when input is a list of strs
                 new_sub_input = []
                 for src_name in sub_input:
-                    if src_name in block_module:
-                        new_sub_input.append(block_name + '/' + src_name)
-                    else:
-                        new_sub_input.append(src_name)
+                    new_name = block_name + '/' + src_name if src_name in block_module else src_name
+                    new_sub_input.append(new_name)
                 sub_module['input'] = new_sub_input
-            else:       # when input is a single str
-                if sub_input in block_module:
-                    sub_module['input'] = block_name + '/' + sub_input
-                else:
-                    sub_module['input'] = sub_input
+            elif isinstance(sub_input, str):       # when input is a single str
+                sub_module['input'] = block_name + '/' + sub_input if sub_input in block_module else sub_input
 
             new_block_module[block_name + '/' + sub_name] = sub_module
         return new_block_module
 
+    @staticmethod
+    def replace_input_name(block_module, name_map):
+        for sub_name, sub_module in block_module.items():
+            sub_input = sub_module['input']
+            for old_name, new_name in name_map.items():
+                if isinstance(sub_input, list):   # when input is a list of strs
+                    # replace old_name with new_name in sub_input
+                    sub_module['input'] = [new_name if cur_name == old_name else cur_name for cur_name in sub_input]
+                elif isinstance(sub_input, str):       # when input is a single str
+                    sub_module['input'] = new_name if sub_input == old_name else sub_input
+        return block_module
 
 
 class ModelAssembler:
@@ -133,4 +136,3 @@ if __name__ == "__main__":
     model_def = ModelAssembler(cfg.Architecture).get_model_def()
     pp = PrettyPrinter(sort_dicts=False)
     pp.pprint(model_def)
-    print(list(model_def))
