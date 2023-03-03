@@ -14,7 +14,9 @@ class IntegratedLoss:
         if "object" in loss_weights:
             loss_objects["object"] = pool_module.ObjectnessLoss()
         if "category" in loss_weights:
-            loss_objects["category"] = pool_module.CategoryLoss(len(cfg.Tfrdata.CATEGORY_NAMES))
+            loss_objects["category"] = pool_module.CategoryLoss(len(cfg.DataCommon.CATEGORY_NAMES))
+        if "classifier" in loss_weights:
+            loss_objects["classifier"] = pool_module.ClassifierLoss(len(cfg.DataCommon.CATEGORY_NAMES))
         return loss_objects
 
     def __call__(self, features, predictions):

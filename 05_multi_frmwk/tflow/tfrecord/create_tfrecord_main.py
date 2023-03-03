@@ -9,7 +9,7 @@ import settings
 
 
 def create_tfrecords():
-    datasets = cfg.Tfrdata.DATASETS_FOR_TFRECORD
+    datasets = cfg.DataCommon.DATASETS_FOR_TFRECORD
     for dataset, splits in datasets.items():
         for split in splits:
             dataset_cfg = cfg.Datasets.get_dataset_config(dataset)
@@ -18,7 +18,7 @@ def create_tfrecords():
                 print("[convert_to_tfrecords] tfrecord already created in", op.basename(tfrpath))
                 continue
 
-            tfrmaker = TfrecordMaker(dataset_cfg, split, tfrpath, cfg.Tfrdata.SHARD_SIZE)
+            tfrmaker = TfrecordMaker(dataset_cfg, split, tfrpath, cfg.DataCommon.SHARD_SIZE)
             tfrmaker.make()
 
 

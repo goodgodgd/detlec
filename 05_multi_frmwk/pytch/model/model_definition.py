@@ -8,19 +8,28 @@ class ModuleParts:
         channel, height, width = src_shape
         module = {
             'image1': {'type': 'input', 'out_channels': channel, 'out_resol': np.array((height, width), dtype=np.int32)},
-            'conv1': {'type': 'conv2d', 'input': 'image1', 'in_channels': None, 'out_channels': 32, 'kernel_size': 3, 'padding': None, 'activation': 'relu', 'in_resol': None, 'out_resol': None},
-            'resblock1': {'type': 'resblock', 'input': 'conv1'},
-            'pool1': {'type': 'maxpool', 'input': 'resblock1/add', 'kernel_size': 2, 'stride': 2, 'in_channels': None, 'out_channels': None, 'in_resol': None, 'out_resol': None},
-            'conv3': {'type': 'conv2d', 'input': 'pool1', 'out_channels': 64, 'kernel_size': 3, 'activation': 'relu', 'output': True},
+            'conv1': {'type': 'conv2d', 'input': 'image1', 'out_channels': 32, 'kernel_size': 3},
+            'conv1/relu': {'type': 'relu', 'input': 'conv1'},
+            'resblock1': {'type': 'resblock', 'input': 'conv1/relu'},
+            'pool1': {'type': 'maxpool', 'input': 'resblock1/add', 'kernel_size': 2, 'stride': 2},
+            'conv2': {'type': 'conv2d', 'input': 'pool1', 'out_channels': 64, 'kernel_size': 3, 'output': True},
+            'conv2/relu': {'type': 'relu', 'input': 'conv2'},
+            'flatten': {'type': 'flatten', 'input': 'conv2/relu'},
+            'linear1': {'type': 'linear', 'input': 'flatten', 'out_channels': 100},
+            'linear1/relu': {'type': 'relu', 'input': 'linear1'},
+            'linear2': {'type': 'linear', 'input': 'linear1/relu', 'out_channels': 10},
+            'linear2/softmax': {'type': 'softmax', 'input': 'linear2', 'dim': -1, 'output': True},
         }
         return module
 
     @staticmethod
     def get_resblock(block_name, src_name, in_channels):
         module = {
-            'conv1': {'type': 'conv2d', 'input': 'src', 'out_channels': in_channels // 2, 'kernel_size': 3, 'activation': 'relu'},
-            'conv2': {'type': 'conv2d', 'input': 'conv1', 'out_channels': in_channels, 'kernel_size': 3, 'activation': 'relu'},
-            'add': {'type': 'add', 'input': ['src', 'conv2']},
+            'conv1': {'type': 'conv2d', 'input': 'src', 'out_channels': in_channels // 2, 'kernel_size': 3},
+            'conv1/relu': {'type': 'relu', 'input': 'conv1'},
+            'conv2': {'type': 'conv2d', 'input': 'conv1/relu', 'out_channels': in_channels, 'kernel_size': 3},
+            'conv2/relu': {'type': 'relu', 'input': 'conv2'},
+            'add': {'type': 'add', 'input': ['src', 'conv2/relu']},
         }
         module = ModuleParts.append_block_name(block_name, module)
         module = ModuleParts.replace_input_name(module, {'src': src_name})
@@ -69,7 +78,8 @@ class ModelAssembler:
     def fill_modules_def(self, adding_modules, new_modules=None):
         new_modules = {} if new_modules is None else new_modules
         module_filler = {'input': self.fill_input, 'conv2d': self.fill_conv2d, 'resblock': self.fill_resblock,
-                         'maxpool': self.fill_maxpool, 'add': self.fill_add,
+                         'maxpool': self.fill_maxpool, 'add': self.fill_add, 'relu': self.fill_default,
+                         'flatten': self.fill_flatten, 'linear': self.fill_linear, 'softmax': self.fill_default
                          }
         for name, module_def in adding_modules.items():
             new_modules = module_filler[module_def['type']](module_def, new_modules, name)
@@ -93,11 +103,11 @@ class ModelAssembler:
         bef_module = building_modules[cur_module['input']]
         cur_module['in_channels'] = bef_module['out_channels']
         cur_module['in_resol'] = bef_module['out_resol']
+        cur_module['out_resol'] = cur_module['in_resol']
         cur_module['padding'] = 'same'
-        if 'stride' in cur_module:
-            cur_module['out_resol'] = cur_module['in_resol'] // cur_module['stride']
-        else:
-            cur_module['out_resol'] = cur_module['in_resol']
+        if 'stride' not in cur_module:
+            cur_module['stride'] = 1
+        cur_module['out_resol'] = cur_module['in_resol'] // cur_module['stride']
         building_modules[cur_name] = cur_module
         return building_modules
 
@@ -105,10 +115,7 @@ class ModelAssembler:
         """
         fill in new attributes: ['in_channels', 'out_channels', 'in_resol', 'out_resol']
         """
-        bef_module = building_modules[cur_module['input']]
-        cur_module['in_channels'] = bef_module['out_channels']
-        cur_module['out_channels'] = cur_module['in_channels']
-        cur_module['in_resol'] = bef_module['out_resol']
+        cur_module = self.set_default(cur_module, building_modules)
         cur_module['out_resol'] = cur_module['in_resol'] // cur_module['stride']
         building_modules[cur_name] = cur_module
         return building_modules
@@ -128,6 +135,36 @@ class ModelAssembler:
         cur_module['out_resol'] = cur_module['in_resol']
         building_modules[cur_name] = cur_module
         return building_modules
+
+    def fill_flatten(self, cur_module, building_modules, cur_name):
+        bef_module = building_modules[cur_module['input']]
+        cur_module['in_channels'] = bef_module['out_channels']
+        cur_module['in_resol'] = bef_module['out_resol']
+        cur_module['out_channels'] = cur_module['in_channels'] * cur_module['in_resol'][0] * cur_module['in_resol'][1]
+        building_modules[cur_name] = cur_module
+        return building_modules
+
+    def fill_linear(self, cur_module, building_modules, cur_name):
+        bef_module = building_modules[cur_module['input']]
+        cur_module['in_channels'] = bef_module['out_channels']
+        building_modules[cur_name] = cur_module
+        return building_modules
+
+    def fill_default(self, cur_module, building_modules, cur_name):
+        building_modules[cur_name] = self.set_default(cur_module, building_modules)
+        return building_modules
+
+    def set_default(self, cur_module, building_modules):
+        """
+        fill in attributes by the same value with bef_module: ['in_channels', 'out_channels', 'in_resol', 'out_resol']
+        """
+        bef_module = building_modules[cur_module['input']]
+        cur_module['in_channels'] = bef_module['out_channels']
+        cur_module['out_channels'] = cur_module['in_channels']
+        if 'out_resol' in bef_module:
+            cur_module['in_resol'] = bef_module['out_resol']
+            cur_module['out_resol'] = cur_module['in_resol']
+        return cur_module
 
 
 import config as cfg

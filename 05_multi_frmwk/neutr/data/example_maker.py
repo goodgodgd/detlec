@@ -10,8 +10,8 @@ class ExampleMaker:
     def __init__(self, data_reader, dataset_cfg,
                  feat_scales=cfg.ModelOutput.FEATURE_SCALES,
                  anchors_ratio=cfg.ModelOutput.ANCHORS_RATIO,
-                 category_names=cfg.Tfrdata.CATEGORY_NAMES,
-                 max_bbox=cfg.Tfrdata.MAX_BBOX_PER_IMAGE):
+                 category_names=cfg.DataCommon.CATEGORY_NAMES,
+                 max_bbox=cfg.DataCommon.MAX_BBOX_PER_IMAGE):
         self.data_reader = data_reader
         self.feat_scales = feat_scales
         self.anchors_ratio = anchors_ratio
@@ -32,7 +32,7 @@ class ExampleMaker:
         return example
 
     def show_example(self, example):
-        category_names = cfg.Tfrdata.CATEGORY_NAMES
+        category_names = cfg.DataCommon.CATEGORY_NAMES
         image = nuf.draw_boxes(example["image"], example["inst"], category_names)
         cv2.imshow("image with bboxes", image)
         cv2.waitKey(100)

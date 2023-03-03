@@ -89,7 +89,7 @@ def test_read_dataset():
         image = tuf.to_uint8_image(x['image'])
         image = image[0].numpy()
         bboxes = x["inst"][0].numpy()
-        image = nuf.draw_boxes(image, bboxes, cfg.Tfrdata.CATEGORY_NAMES)
+        image = nuf.draw_boxes(image, bboxes, cfg.DataCommon.CATEGORY_NAMES)
         cv2.imshow("image with boxes", image)
         key = cv2.waitKey()
         if key == ord('q'):

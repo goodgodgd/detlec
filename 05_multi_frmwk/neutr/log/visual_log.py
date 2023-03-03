@@ -16,7 +16,7 @@ class VisualLog:
             os.makedirs(self.vlog_path)
         if not op.isdir(self.heatmap_path):
             os.makedirs(self.heatmap_path)
-        self.categories = cfg.Tfrdata.CATEGORY_NAMES
+        self.categories = cfg.DataCommon.CATEGORY_NAMES
 
     def __call__(self, step, grtr, pred):
         """

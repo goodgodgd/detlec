@@ -19,7 +19,7 @@ class HistoryLog:
         self.start = timer()
         self.summary = dict()
         self.nms_box = mu.NonMaximumSuppressionBox()
-        self.num_ctgr = len(cfg.Tfrdata.CATEGORY_NAMES)
+        self.num_ctgr = len(cfg.DataCommon.CATEGORY_NAMES)
 
     def __call__(self, step, grtr, pred, total_loss, loss_by_type):
         batch_data = {loss_name: loss_tensor for loss_name, loss_tensor in loss_by_type.items() if not isinstance(loss_tensor, list)}

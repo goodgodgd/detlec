@@ -14,7 +14,7 @@ class Logger:
         self.history_logger = HistoryLog(epoch, ckpt_path, is_train)
         self.visual_logger = VisualLog(epoch, ckpt_path) if visual_log else None
         self.nms_box = mu.NonMaximumSuppressionBox()
-        self.num_ctgr = len(cfg.Tfrdata.CATEGORY_NAMES)
+        self.num_ctgr = len(cfg.DataCommon.CATEGORY_NAMES)
         self.epoch = epoch
         self.ckpt_path = ckpt_path
         self.convert_to_numpy = convert_to_numpy

@@ -28,10 +28,10 @@ class Classifier(nn.Module):
 
 
 
-class CnnModel(nn.Module):
-    def __init__(self, architecture=cfg.Architecture):
+class ModelTemplate(nn.Module):
+    def __init__(self, architecture=cfg.Architecture, imshape=(3,320,320)):
         super().__init__()
-        self.model_def = pmd.ModelAssembler(architecture).get_model_def()
+        self.model_def = pmd.ModelAssembler(architecture, imshape).get_model_def()
         self.modules = self.build()
         self.input_names = [name for (name, module) in self.model_def.items() if module['type'] == 'input']
         self.output_names = [name for (name, module) in self.model_def.items() if 'output' in module and module['output'] is True]
@@ -47,6 +47,17 @@ class CnnModel(nn.Module):
                 modules[name] = (self.single_input, torch.nn.MaxPool2d(**args))
             elif module_def['type'] == 'add':
                 modules[name] = (self.multi_input, lambda x: x[0] + x[1])
+            elif module_def['type'] == 'relu':
+                modules[name] = (self.single_input, torch.nn.ReLU())
+            elif module_def['type'] == 'flatten':
+                out_channels = module_def['out_channels']
+                modules[name] = (self.single_input, lambda x: x.view(-1, out_channels))
+            elif module_def['type'] == 'linear':
+                key_map = {'in_channels': 'in_features', 'out_channels': 'out_features'}
+                args = {key_map[key]: module_def[key] for key in ['in_channels', 'out_channels']}
+                modules[name] = (self.single_input, torch.nn.Linear(**args))
+            elif module_def['type'] == 'softmax':
+                modules[name] = (self.single_input, torch.nn.Softmax(dim=self.model_def[name]['dim']))
             elif module_def['type'] == 'input':
                 pass
             else:
@@ -63,13 +74,14 @@ class CnnModel(nn.Module):
     def forward(self, x):
         module_outputs = {self.input_names[0]: x}
         for name, (input_gen, module) in self.modules.items():
-            module_outputs[name] = module(input_gen(self.model_def[name]['input'], module_outputs))
+            input_tensor = input_gen(self.model_def[name]['input'], module_outputs)
+            module_outputs[name] = module(input_tensor)
         model_output = {name: module_outputs[name] for name in self.output_names}
         return model_output
 
 
 if __name__ == "__main__":
-    cnn = CnnModel()
-    x = torch.rand((3, 320, 320), dtype=torch.float32)
+    cnn = ModelTemplate()
+    x = torch.rand((2, 3, 320, 320), dtype=torch.float32)
     y = cnn(x)
-    print("cnn output", y.keys(), y['conv3'].size())
+    print("cnn output", y['linear2/softmax'].size())

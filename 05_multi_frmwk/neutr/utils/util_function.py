@@ -3,6 +3,16 @@ import numpy as np
 import cv2
 
 
+def to_float_image(image):
+    image = image / 255. * 2. - 1.
+    return image
+
+
+def to_uint8_image(image):
+    image = ((image + 1) * 255. / 2.).astype(np.uint8)
+    return image
+
+
 def print_progress(status_msg):
     # NOTE: the \r which means the line should overwrite itself.
     msg = "\r" + status_msg

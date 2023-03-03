@@ -34,8 +34,8 @@ def get_transform(dset_cfg):
                                   pp.ExampleBoxScaler(),          # box in (0~1) scale
                                   pp.ExampleCategoryRemapper(dset_cfg.CATEGORIES_TO_USE,
                                                    dset_cfg.CATEGORY_REMAP,
-                                                   cfg.Tfrdata.CATEGORY_NAMES),
-                                  pp.ExampleZeroPadBbox(cfg.Tfrdata.MAX_BBOX_PER_IMAGE),
+                                                   cfg.DataCommon.CATEGORY_NAMES),
+                                  pp.ExampleZeroPadBbox(cfg.DataCommon.MAX_BBOX_PER_IMAGE),
                                   ToTensor()
                                  ])
     return trfm

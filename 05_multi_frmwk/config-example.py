@@ -27,7 +27,7 @@ class Datasets:
         return cls.DATASET_CONFIGS[dataset]
 
 
-class Tfrdata:
+class DataCommon:
     DATASETS_FOR_TFRECORD = {"kitti": ("train", "val")}
     MAX_BBOX_PER_IMAGE = 20
     CATEGORY_NAMES = ["Person", "Car", "Van", "Bicycle"]
@@ -38,7 +38,7 @@ class ModelOutput:
     FEATURE_SCALES = [8, 16, 32]
     NUM_ANCHORS_PER_SCALE = 3
     GRTR_FMAP_COMPOSITION = {"yxhw": 4, "object": 1, "category": 1}
-    PRED_FMAP_COMPOSITION = {"yxhw": 4, "object": 1, "category": len(Tfrdata.CATEGORY_NAMES)}
+    PRED_FMAP_COMPOSITION = {"yxhw": 4, "object": 1, "category": len(DataCommon.CATEGORY_NAMES)}
     ANCHORS_RATIO = None  # assigned by update_anchors()
 
 
