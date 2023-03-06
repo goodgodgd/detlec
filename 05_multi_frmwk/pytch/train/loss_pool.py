@@ -49,7 +49,7 @@ class CiouLoss(LossBase):
         # pred_hw_ratio = tf.math.divide_no_nan(pred_yxhw[:, 2], pred_yxhw[:, 3])
         grtr_hw_ratio = grtr_yxhw[:, 2] / (grtr_yxhw[:, 3] + 1.0e-5)
         pred_hw_ratio = pred_yxhw[:, 2] / (pred_yxhw[:, 3] + 1.0e-5)
-        coeff = torch.tensor(4.0 / (np.pi * np.pi), dtype=torch.float32)
+        coeff = torch.tensor(4.0 / (np.pi * np.pi))
         v = coeff * torch.pow((torch.atan(grtr_hw_ratio) - torch.atan(pred_hw_ratio)), 2)
         alpha = v / (1 - iou + v)
         penalty = d + alpha * v
@@ -127,7 +127,7 @@ class ClassifierLoss(LossBase):
 
     def __call__(self, grtr, pred, scale):
         celoss = torch.nn.CrossEntropyLoss(reduction='none', label_smoothing=0.05)
-        ctgr_loss = celoss(pred, grtr)  # (batch, AHW)
+        ctgr_loss = celoss(pred['linear2/softmax'], grtr)  # (batch, AHW)
         scalar_loss = torch.sum(ctgr_loss)
         return scalar_loss, ctgr_loss
 

@@ -27,7 +27,8 @@ class IntegratedLoss:
             loss_by_type[loss_name] = 0
             loss_by_type[loss_map_key] = []
             for scale in range(self.num_scale):
-                scalar_loss, loss_map = loss_object(features["fmap"], predictions["fmap"], scale)
+                # scalar_loss, loss_map = loss_object(features["fmap"], predictions["fmap"], scale)
+                scalar_loss, loss_map = loss_object(features, predictions, scale)
                 weight = self.loss_weights[loss_name]
                 weight = weight[scale] if isinstance(weight, list) else weight
                 total_loss += scalar_loss * weight

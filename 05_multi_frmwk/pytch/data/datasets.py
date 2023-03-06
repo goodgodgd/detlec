@@ -33,7 +33,8 @@ class Kitti2dDetectDataset:
 
 
 class Cifar10Dataset:
-    def __init__(self, split, batch_size, shuffle):
+    def __init__(self, data_path, split, batch_size, shuffle):
+        self.data_path = data_path
         self.split = split
         self.batch_size = batch_size
         self.dataset = self.get_dataset(split)
@@ -41,18 +42,20 @@ class Cifar10Dataset:
 
     def get_dataset(self, split):
         train = True if split == 'train' else False
-        cifar = torchvision.datasets.CIFAR10(root='./data', train=train, download=True)
+        cifar = torchvision.datasets.CIFAR10(root=self.data_path, train=train, download=True)
         class_names = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
         # pytorch uses image shape like (batch, channel, height, width)
         x = np.transpose(np.array(cifar.data), (0, 3, 1, 2))
         y = np.array(cifar.targets)
         x = nuf.to_float_image(x)
-        x, y = torch.from_numpy(x).float(), torch.from_numpy(y)
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        x = torch.from_numpy(x).float().to(device)
+        y = torch.from_numpy(y).long().to(device)
         dataset = torch.utils.data.TensorDataset(x, y)
         return dataset
 
     def get_dataloader(self):
-        steps = len(self.dataset // self.batch_size)
+        steps = len(self.dataset) // self.batch_size
         x, y = self.dataset[0]
-        imshape = x.size()[1:]
+        imshape = x.shape
         return self.dataloader, steps, imshape

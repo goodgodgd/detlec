@@ -59,9 +59,10 @@ class ModelTemplate(nn.Module):
             elif module_def['type'] == 'softmax':
                 modules[name] = (self.single_input, torch.nn.Softmax(dim=self.model_def[name]['dim']))
             elif module_def['type'] == 'input':
-                pass
+                continue
             else:
                 assert 0, f"No module type {module_def['type']} is defined"
+            setattr(self, name, modules[name][1])
         return modules
 
     def single_input(self, src_name, prior_outputs):
@@ -84,4 +85,4 @@ if __name__ == "__main__":
     cnn = ModelTemplate()
     x = torch.rand((2, 3, 320, 320), dtype=torch.float32)
     y = cnn(x)
-    print("cnn output", y['linear2/softmax'].size())
+    print("cnn output", y['linear2/softmax'].shape)

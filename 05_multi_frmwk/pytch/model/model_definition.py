@@ -17,7 +17,7 @@ class ModuleParts:
             'flatten': {'type': 'flatten', 'input': 'conv2/relu'},
             'linear1': {'type': 'linear', 'input': 'flatten', 'out_channels': 100},
             'linear1/relu': {'type': 'relu', 'input': 'linear1'},
-            'linear2': {'type': 'linear', 'input': 'linear1/relu', 'out_channels': 10},
+            'linear2': {'type': 'linear', 'input': 'linear1/relu', 'out_channels': 10, 'output': True},
             'linear2/softmax': {'type': 'softmax', 'input': 'linear2', 'dim': -1, 'output': True},
         }
         return module
@@ -79,7 +79,7 @@ class ModelAssembler:
         new_modules = {} if new_modules is None else new_modules
         module_filler = {'input': self.fill_input, 'conv2d': self.fill_conv2d, 'resblock': self.fill_resblock,
                          'maxpool': self.fill_maxpool, 'add': self.fill_add, 'relu': self.fill_default,
-                         'flatten': self.fill_flatten, 'linear': self.fill_linear, 'softmax': self.fill_default
+                         'flatten': self.fill_flatten, 'linear': self.fill_linear, 'softmax': self.fill_softmax
                          }
         for name, module_def in adding_modules.items():
             new_modules = module_filler[module_def['type']](module_def, new_modules, name)
@@ -126,7 +126,6 @@ class ModelAssembler:
         """
         bef_module0 = building_modules[cur_module['input'][0]]
         bef_module1 = building_modules[cur_module['input'][0]]
-        print("fild add", bef_module0['out_channels'], bef_module1['out_channels'])
         assert bef_module0['out_channels'] == bef_module1['out_channels']
         assert np.allclose(bef_module0['out_resol'], bef_module1['out_resol'])
         cur_module['in_channels'] = bef_module0['out_channels']
@@ -147,6 +146,12 @@ class ModelAssembler:
     def fill_linear(self, cur_module, building_modules, cur_name):
         bef_module = building_modules[cur_module['input']]
         cur_module['in_channels'] = bef_module['out_channels']
+        building_modules[cur_name] = cur_module
+        return building_modules
+
+    def fill_softmax(self, cur_module, building_modules, cur_name):
+        cur_module = self.set_default(cur_module, building_modules)
+        cur_module['dim'] = 1
         building_modules[cur_name] = cur_module
         return building_modules
 

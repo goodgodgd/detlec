@@ -17,3 +17,7 @@ if project_path not in sys.path:
     sys.path.append(project_path)
 
 print("syspath", sys.path)
+
+import torch
+if torch.cuda.is_available():
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')

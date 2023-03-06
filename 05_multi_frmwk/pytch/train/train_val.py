@@ -7,6 +7,91 @@ import numpy as np
 import matplotlib.pyplot as plt
 from timeit import default_timer as timer
 
+import neutr.utils.util_function as nuf
+import pytch.utils.util_function as puf
+from neutr.log.logger import Logger
+from pytch.train.fmap_generator import SinglePositivePolicy
+
+
+class TrainValBase:
+    def __init__(self, model, loss_object, epoch_steps, ckpt_path, optimizer):
+        self.model = model
+        self.loss_object = loss_object
+        self.epoch_steps = epoch_steps
+        self.ckpt_path = ckpt_path
+        self.optimizer = optimizer
+        self.fmap_generator = SinglePositivePolicy()
+        self.is_train = True
+        self.mode = 'training'
+        self.total_count = 0
+        self.correct_count = 0
+
+    def run_epoch(self, dataset, epoch: int, visual_log: bool):
+        logger = Logger(epoch, self.ckpt_path, visual_log, self.is_train, puf.convert_to_numpy)
+        self.reset()
+        for step, features in enumerate(dataset):
+            start = timer()
+            # features = self.fmap_generator(features)
+            prediction, total_loss, loss_by_type = self.run_batch(features)
+            # logger.log_batch_result(step, features, prediction, total_loss, loss_by_type)
+            nuf.print_progress(f"{self.mode} {step}/{self.epoch_steps} steps, "
+                               f"time={timer() - start:.3f}, "
+                               f"loss={total_loss:.3f}, ")
+            # if step > 20:
+            #     break
+
+        print("")
+        # logger.finalize()
+        self.evaluate()
+
+    def run_batch(self, features):
+        raise NotImplementedError()
+
+    def reset(self):
+        self.total_count = 0
+        self.correct_count = 0
+        if self.is_train:
+            self.model.train()
+        else:
+            self.model.eval()
+
+    def evaluate(self):
+        correct_count = self.correct_count.detach().cpu().numpy()
+        print(f"[evaluate result] correct={correct_count}, total={self.total_count}, accuracy={correct_count/self.total_count}")
+
+
+class ModelTrainer(TrainValBase):
+    def __init__(self, model, loss_object, epoch_steps, ckpt_path, optimizer):
+        super().__init__(model, loss_object, epoch_steps, ckpt_path, optimizer)
+        self.is_train = True
+        self.mode = 'training'
+
+    def run_batch(self, features):
+        x_batch, y_batch = features
+        self.optimizer.zero_grad()
+        y_pred = self.model(x_batch)
+        total_loss, loss_by_type = self.loss_object(y_batch, y_pred)
+        total_loss.backward()
+        self.optimizer.step()
+        self.correct_count += torch.sum(torch.argmax(y_pred['linear2/softmax'], dim=1) == y_batch)
+        self.total_count += y_batch.shape[0]
+        return y_pred, total_loss, loss_by_type
+
+
+class ModelValidater(TrainValBase):
+    def __init__(self, model, loss_object, epoch_steps, ckpt_path, optimizer=None):
+        super().__init__(model, loss_object, epoch_steps, ckpt_path, optimizer)
+        self.is_train = False
+        self.mode = 'evaluating'
+
+    def run_batch(self, features):
+        x_batch, y_batch = features
+        y_pred = self.model(x_batch)
+        total_loss, loss_by_type = self.loss_object(y_batch, y_pred)
+        self.correct_count += torch.sum(torch.argmax(y_pred['linear2/softmax'], dim=1) == y_batch)
+        self.total_count += y_batch.shape[0]
+        return y_pred, total_loss, loss_by_type
+
 
 class TorchClassifier:
     def __init__(self, model, batch_size=32, val_ratio=0.2):
