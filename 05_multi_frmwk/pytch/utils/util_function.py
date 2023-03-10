@@ -110,8 +110,9 @@ def convert_to_numpy(data):
         for key, datum in data.items():
             data[key] = convert_to_numpy(datum)
     elif torch.is_tensor(data):
-        npdata =  data.detach().cpu().numpy()
-        return np.moveaxis(npdata, 1, -1)   # convert to channel last format
+        data =  data.detach().cpu().numpy()
+        if data.ndim > 2:
+            data = np.moveaxis(data, 1, -1)   # convert channel first to channel last format
     return data
 
 
