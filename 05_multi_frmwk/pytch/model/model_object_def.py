@@ -4,12 +4,27 @@ from pprint import PrettyPrinter
 import torch
 
 
+class NamePool:
+    count = 0
+    names = {}
+
+    @staticmethod
+    def new_key(name: str):
+        NamePool.count += 1
+        NamePool.names[NamePool.count] = name
+        return NamePool.count
+
+    @staticmethod
+    def get_name(key: int):
+        return NamePool.names[key]
+
+
 class ModelTemplate:
     def __init__(self, architecture, input_shape=(3, 320, 320)):
-        model_def = ModelDef.get_cnn(input_shape)
-        self.input_names = [name for (name, module) in self.model_def.items() if isinstance(module, Input)]
-        self.output_names = [name for (name, module) in self.model_def.items() if module['output']]
-        self.model_def = assemble_modules(model_def)
+        model_def = ModelDefFactory(architecture, input_shape).get_model_def()
+        self.input_names = [name for (name, module) in model_def.items() if isinstance(module, Input)]
+        self.output_names = [name for (name, module) in model_def.items() if module['output']]
+        self.model_def = model_def
         self.modules = self.build(self.model_def)
         pp = PrettyPrinter(sort_dicts=False)
         pp.pprint(self.modules)
@@ -35,7 +50,7 @@ class ModuleDefBase:
         self.props[key] = value
 
     def __str__(self):
-        return str(self.props)
+        return self.__class__.__name__ + str(self.props)
 
     def __contains__(self, key):
         return key in self.props
@@ -48,6 +63,24 @@ class ModuleDefBase:
         self['out_channels'] = self['in_channels']
         self['in_resol'] = bef_module['out_resol']
         self['out_resol'] = self['in_resol']
+
+    def append_name_prefix(self, prefix):
+        self.append_name_prefix_to_self(prefix)
+
+    def append_name_prefix_to_self(self, prefix):
+        if prefix is None:
+            return
+        self['name'] = prefix + '/' + self['name']
+        print("== append name", self['name'], prefix)
+        if 'in_name' not in self:
+            return
+        print("-- append in_name1", self['in_name'])
+        if isinstance(self['in_name'], list):
+            self['in_name'] = [prefix + '/' + in_name if not in_name.startswith('/') else in_name
+                               for in_name in  self['in_name']]
+        else:
+            self['in_name'] = prefix + '/' + self['in_name'] if not self['in_name'].startswith('/') else self['in_name']
+        print("-- append in_name2", self['in_name'])
 
     def get_module(self):
         pass
@@ -65,6 +98,10 @@ class Input(ModuleDefBase):
         super().__init__()
         out_resol = np.array(chw_shape[1:], dtype=np.int32)
         self.props = {'name': name, 'out_channels': chw_shape[0], 'out_resol': out_resol, 'output': output}
+
+    def fill_and_append(self, building_modules):
+        building_modules[self['name']] = self
+        return building_modules
 
 
 class Conv2d(ModuleDefBase):
@@ -201,56 +238,105 @@ class Linear(ModuleDefBase):
 
 
 class BlockModuleDefBase(ModuleDefBase):
-    def __init__(self, name):
+    def __init__(self, name, in_name=None):
         super().__init__()
         self.props['name'] = name
-        self.block_def = {}
+        if in_name is not None:
+            self.props['in_name'] = in_name
+        self.block_def = []
 
-    def fill_and_append(self, building_modules=None):
+    def fill_and_append(self, building_modules):
         building_modules = {} if building_modules is None else building_modules
-        self.block_def = self.append_block_name(self['name'], self.block_def)
+        print("==block module names", [block['name'] for block in self.block_def])
+        print("==block module input names", [block['in_name'] for block in self.block_def if 'in_name' in block])
         for module_def in self.block_def:
+            module_def.append_name_prefix(self['name'])
+            print("[block fill] module def", module_def)
+            print("[block fill] building", building_modules)
             building_modules = module_def.fill_and_append(building_modules)
         return building_modules
 
-    def append_block_name(self, block_name, block_module):
-        # TODO
-        new_block_module = {}
-        for sub_name, sub_module in block_module.items():
-            sub_input = sub_module['input']
-            if isinstance(sub_input, list):   # when input is a list of strs
-                new_sub_input = []
-                for src_name in sub_input:
-                    new_name = block_name + '/' + src_name if src_name in block_module else src_name
-                    new_sub_input.append(new_name)
-                sub_module['input'] = new_sub_input
-            elif isinstance(sub_input, str):       # when input is a single str
-                sub_module['input'] = block_name + '/' + sub_input if sub_input in block_module else sub_input
 
-            new_block_module[block_name + '/' + sub_name] = sub_module
-        return new_block_module
+    def append_block_name(self, block_name, block_mod_def):
+        new_block_mod_def = []
+        block_mod_names = [module['name'] for module in block_mod_def]
+        for sub_mod_def in block_mod_def:
+            if 'in_name' in sub_mod_def:
+                sub_input = sub_mod_def['in_name']
+                if isinstance(sub_input, list):   # when input is a list of strs
+                    new_sub_input = []
+                    for src_name in sub_input:
+                        new_name = block_name + '/' + src_name if src_name in block_mod_names else src_name
+                        new_sub_input.append(new_name)
+                    sub_mod_def['in_name'] = new_sub_input
+                elif isinstance(sub_input, str):       # when input is a single str
+                    sub_mod_def['in_name'] = block_name + '/' + sub_input if sub_input in block_mod_names else sub_input
+            sub_mod_def['name'] = block_name + '/' + sub_mod_def['name']
+            new_block_mod_def.append(sub_mod_def)
+        return new_block_mod_def
+
+    def __str__(self):
+        text = self.__class__.__name__ + '={\n'
+        text += f"\tname: {self['name']}\n"
+        if 'in_name' in self:
+            text += f"\tin_name: {self['in_name']}\n"
+        for index, (module_def) in enumerate(self.block_def):
+            text += f"\t{module_def['name']}: {module_def}\n"
+        text += '}'
+        return text
+
+    def update_names(self):
+        print("==before update names", self['name'], [block['name'] for block in self.block_def])
+        print("==before update input names", [block['in_name'] for block in self.block_def if 'in_name' in block])
+        for module_def in self.block_def:
+            module_def.append_name_prefix(self['name'])
+        print("==after update names", self['name'], [block['name'] for block in self.block_def])
+        print("==after update input names", [block['in_name'] for block in self.block_def if 'in_name' in block])
+
+    def append_name_prefix(self, prefix):
+        src_in_name = self['in_name']
+        self.append_name_prefix_to_self(prefix)
+        dst_in_name = self['in_name']
+        print("appending", src_in_name, dst_in_name)
+        for module_def in self.block_def:
+            if module_def['in_name'] == src_in_name:
+                pass
 
 
-class ModuleDefFactory(BlockModuleDefBase):
+class ModelDefFactory(BlockModuleDefBase):
     def __init__(self, architecture, src_shape):
-        super().__init__('')
+        super().__init__('')    # top name must be ''(empty) or start with '/' e.g. '/model'
         self.block_def = [
             Input('image', chw_shape=src_shape),
-            ResNet1('bkbn', in_name='image', out_channels=64),
-            Classifier('clsf', in_name='conv2/relu', num_class=10)
+            ResBlock('resblock', 'image')
+            # ResNet1('bkbn', in_name='image', out_channels=64),
+            # Classifier('clsf', in_name='conv2/relu', num_class=10)
         ]
-        self.block_def = self.fill_and_append(self['name'])
+        self.update_names()
+        self.model_def = self.fill_and_append({})
+        print("== final model def", self.model_def)
+
+    def get_model_def(self):
+        return self.model_def
+
+    def __str__(self):
+        text = "Model{\n"
+        for index, (name, module_def) in enumerate(self.model_def.items()):
+            text += f"\t{name}: {module_def}\n"
+        text += '}'
+        return text
 
 
 class ResNet1(BlockModuleDefBase):
     def __init__(self, name, in_name, out_channels):
-        super().__init__(name)
+        super().__init__(name, in_name)
         self.block_def = [
             # 'image1': Input(out_channels=channel, out_resol=np.array((height, width), dtype=np.int32)),
             Conv2d('conv1', in_name=in_name, out_channels=32),
             Activation('conv1/relu', function='relu', in_name='conv1'),
             ResBlock('resblock1', in_name='conv1/relu'),
-            MaxPool2d('pool1', in_name='resblock1/add', kernel_size=2, stride=2),
+            ResBlock('resblock2', in_name='conv1/relu'),
+            MaxPool2d('pool1', in_name='resblock2/add', kernel_size=2, stride=2),
             Conv2d('conv2', in_name='pool1', out_channels=out_channels),
             Activation('conv2/relu', function='relu', in_name='conv2'),
         ]
@@ -258,7 +344,7 @@ class ResNet1(BlockModuleDefBase):
 
 class ResBlock(BlockModuleDefBase):
     def __init__(self, name, in_name):
-        super().__init__(name)
+        super().__init__(name, in_name)
         self.block_def = [
             Conv2d('conv1', in_name=in_name),
             Activation('conv1/relu', function='relu', in_name='conv1'),
@@ -270,7 +356,7 @@ class ResBlock(BlockModuleDefBase):
 
 class Classifier(BlockModuleDefBase):
     def __init__(self, name, in_name, num_class):
-        super().__init__(name)
+        super().__init__(name, in_name)
         self.block_def = [
             Flatten('flatten', in_name=in_name),
             Linear('linear1', in_name='flatten', out_features=100),
@@ -279,3 +365,8 @@ class Classifier(BlockModuleDefBase):
             Activation('linear2/softmax', function='softmax', in_name='linear2', dim=-1, output=True),
         ]
 
+
+if __name__ == "__main__":
+    model_def = ModelDefFactory(None, (3, 320, 320)).get_model_def()
+    pp = PrettyPrinter(sort_dicts=False)
+    pp.pprint(model_def)
