@@ -3,6 +3,7 @@ from copy import deepcopy
 from pprint import PrettyPrinter
 import torch
 
+import config as cfg
 
 class NamePool:
     count = 0
@@ -19,8 +20,9 @@ class NamePool:
         return NamePool.names[key]
 
 
-class ModelTemplate:
+class ModelTemplate(torch.nn.Module):
     def __init__(self, architecture, input_shape=(3, 320, 320)):
+        super().__init__()
         model_def = ModelDefFactory(architecture, input_shape).get_model_def()
         self.input_names = [name for (name, module) in model_def.items() if isinstance(module, Input)]
         self.output_names = [name for (name, module) in model_def.items() if module['output']]
@@ -36,6 +38,16 @@ class ModelTemplate:
                 continue
             modules[name] = part.get_module()
         return modules
+
+    def forward(self, x):
+        module_outputs = {self.input_names[0]: x}
+        for name, (input_gen, module) in self.modules.items():
+            print("module outputs" ,module_outputs.keys())
+            input_tensor = input_gen(self.model_def[name]['in_name'], module_outputs)
+            module_outputs[name] = module(input_tensor)
+        model_output = {name: module_outputs[name] for name in self.output_names}
+        return model_output
+
 
 
 class ModuleDefBase:
@@ -75,9 +87,6 @@ class ModuleDefBase:
             self['out_resol'] = self['in_resol']
 
     def append_name_prefix(self, prefix):
-        self.append_name_prefix_to_self(prefix)
-
-    def append_name_prefix_to_self(self, prefix):
         if prefix is None:
             return
         self['name'] = prefix + '/' + self['name']
@@ -110,7 +119,6 @@ class ModuleDefBase:
             replacement = dict(zip(ModuleDefBase.INPUT_NAMES, new_in_name))
         else:
             replacement = {ModuleDefBase.INPUT_NAMES[0]: new_in_name}
-        print("propagate", replacement)
         if isinstance(self['in_name'], list):
             for i, in_name in enumerate(self['in_name']):
                 if in_name in replacement:
@@ -136,7 +144,7 @@ class Conv2d(ModuleDefBase):
         self.props = {'name': name, 'in_name': in_name, 'in_channels': None, 'out_channels': out_channels,
                       'stride': stride, 'kernel_size': kernel_size, 'padding': padding,
                       'in_resol': None, 'out_resol': None, 'output': output}
-        self.args = ['name', 'in_channels', 'out_channels', 'kernel_size', 'padding', 'stride']
+        self.args = ['in_channels', 'out_channels', 'kernel_size', 'padding', 'stride']
 
     def fill_and_append(self, building_modules):
         bef_module = building_modules[self['in_name']]
@@ -158,7 +166,7 @@ class MaxPool2d(ModuleDefBase):
         self.props = {'name': name, 'in_name': in_name, 'in_channels': None, 'out_channels': None,
                       'stride': stride, 'kernel_size': kernel_size,
                       'in_resol': None, 'out_resol': None, 'output': output}
-        self.args = ['name', 'kernel_size', 'stride']
+        self.args = ['kernel_size', 'stride']
 
     def fill_and_append(self, building_modules):
         bef_module = building_modules[self['in_name']]
@@ -179,7 +187,7 @@ class Activation(ModuleDefBase):
                       'in_channels': None, 'out_channels': None,
                       'in_resol': None, 'out_resol': None, 'output': output}
         self.props.update(kwargs)
-        self.args = ['name'] + list(kwargs.keys())
+        self.args = list(kwargs.keys())
 
     def fill_and_append(self, building_modules):
         bef_module = building_modules[self['in_name']]
@@ -209,9 +217,6 @@ class Arithmetic(ModuleDefBase):
     def fill_and_append(self, building_modules):
         bef_module0 = building_modules[self['in_name'][0]]
         bef_module1 = building_modules[self['in_name'][1]]
-        print("in names", self['in_name'])
-        print(bef_module0)
-        print(bef_module1)
         assert np.allclose(bef_module0['out_resol'], bef_module1['out_resol'])
         assert bef_module0['out_channels'] == bef_module1['out_channels']
         self.fill_default(bef_module0)
@@ -220,13 +225,13 @@ class Arithmetic(ModuleDefBase):
 
     def get_module(self):
         if self['function'] == 'add':
-            return self.single_input, lambda x: x[0] + x[1]
+            return self.multi_input, lambda x: x[0] + x[1]
         elif self['function'] == 'subtract':
-            return self.single_input, lambda x: x[0] - x[1]
+            return self.multi_input, lambda x: x[0] - x[1]
         elif self['function'] == 'multiply':
-            return self.single_input, lambda x: x[0] * x[1]
+            return self.multi_input, lambda x: x[0] * x[1]
         elif self['function'] == 'divide':
-            return self.single_input, lambda x: x[0] / x[1]
+            return self.multi_input, lambda x: x[0] / x[1]
 
 
 class Flatten(ModuleDefBase):
@@ -253,7 +258,7 @@ class Linear(ModuleDefBase):
         super().__init__()
         self.props = {'name': name, 'in_name': in_name,
                       'in_features': None, 'out_features': out_features, 'output': output}
-        self.args = ['name', 'in_features', 'out_features']
+        self.args = ['in_features', 'out_features']
 
     def fill_and_append(self, building_modules):
         bef_module = building_modules[self['in_name']]
@@ -263,9 +268,8 @@ class Linear(ModuleDefBase):
         return building_modules
 
     def get_module(self):
-        # args = {'name': self['name'], 'in_features': self['in_channels'], 'out_features': self['_channels']}
         args = {arg: self.props[arg] for arg in self.args}
-        return self.single_input, torch.nn.Conv2d(**args)
+        return self.single_input, torch.nn.Linear(**args)
 
 
 class BlockModuleDefBase(ModuleDefBase):
@@ -279,8 +283,7 @@ class BlockModuleDefBase(ModuleDefBase):
 
     def fill_and_append(self, building_modules):
         for module_def in self.block_def:
-            # append prefix(name) in name and in_name if not start with 'input'
-            module_def.append_name_prefix_to_self(self['name'])
+            module_def.append_name_prefix(self['name'])
             if 'in_name' in self:
                 module_def.propagate_in_name(self['in_name'])
             building_modules = module_def.fill_and_append(building_modules)
@@ -296,40 +299,6 @@ class BlockModuleDefBase(ModuleDefBase):
         text += '}'
         return text
 
-    def update_names(self):
-        print("==before update names", self['name'], [block['name'] for block in self.block_def])
-        print("==before update input names", [block['in_name'] for block in self.block_def if 'in_name' in block])
-        for module_def in self.block_def:
-            module_def.append_name_prefix(self['name'])
-            module_def.update_names()
-        print("==after update names", self['name'], [block['name'] for block in self.block_def])
-        print("==after update input names", [block['in_name'] for block in self.block_def if 'in_name' in block])
-
-    def append_name_prefix(self, prefix):
-        src_in_name = self['in_name']
-        self.append_name_prefix_to_self(prefix)
-        dst_in_name = self['in_name']
-        print("appending", src_in_name, dst_in_name)
-        self.replace_in_names()
-
-        for module_def in self.block_def:
-            if isinstance(src_in_name, list) and isinstance(module_def['in_name'], list):
-                for src_name, dst_name in zip(src_in_name, dst_in_name):
-                    for i, in_name in enumerate(module_def['in_name']):
-                        if src_name == in_name:
-                            module_def['in_name'][i] = dst_name
-            elif isinstance(src_in_name, str) and isinstance(module_def['in_name'], list):
-                for i, in_name in enumerate(module_def['in_name']):
-                    if src_in_name == in_name:
-                        module_def['in_name'][i] = dst_in_name
-            elif isinstance(src_in_name, list) and isinstance(module_def['in_name'], str):
-                for src_name, dst_name in zip(src_in_name, dst_in_name):
-                    if src_name == module_def['in_name']:
-                        module_def['in_name'] = dst_name
-            elif isinstance(src_in_name, str) and isinstance(module_def['in_name'], str):
-                if src_in_name == module_def['in_name']:
-                    module_def['in_name'] = dst_in_name
-
 
 class ModelDefFactory(BlockModuleDefBase):
     def __init__(self, architecture, src_shape):
@@ -339,7 +308,6 @@ class ModelDefFactory(BlockModuleDefBase):
             ResNet1('bkbn', in_name='image', out_channels=64),
             Classifier('clsf', in_name='bkbn/conv2/relu', num_class=10)
         ]
-        # self.rebuild()
         self.model_def = self.fill_and_append({})
         print("final model", self)
 
@@ -386,12 +354,9 @@ class ResBlock(BlockModuleDefBase):
         self.block_def[0]['out_channels'] = out_channels // 2
         self.block_def[2]['out_channels'] = out_channels
         for module_def in self.block_def:
-            print("before appned", self['in_name'], module_def)
-            module_def.append_name_prefix_to_self(self['name'])
+            module_def.append_name_prefix(self['name'])
             if 'in_name' in self:
-                print("before propagate", self['in_name'], module_def)
                 module_def.propagate_in_name(self['in_name'])
-                print("after propagate", module_def)
             building_modules = module_def.fill_and_append(building_modules)
         return building_modules
 
@@ -409,6 +374,8 @@ class Classifier(BlockModuleDefBase):
 
 
 if __name__ == "__main__":
-    model_def = ModelDefFactory(None, (3, 320, 320)).get_model_def()
-    # pp = PrettyPrinter(sort_dicts=False)
-    # pp.pprint(model_def)
+    # model_def = ModelDefFactory(None, (3, 320, 320)).get_model_def()
+    model = ModelTemplate(cfg.Architecture)
+    x = torch.rand((2, 3, 320, 320), dtype=torch.float32)
+    y = model(x)
+    print("output shape", y)
