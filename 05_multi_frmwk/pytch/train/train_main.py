@@ -7,7 +7,7 @@ import numpy as np
 
 import settings
 import config as cfg
-from pytch.model.model_factory import ModelTemplate
+from pytch.model.model_object_def import ModelTemplate
 from pytch.data.datasets import Cifar10Dataset
 from neutr.loss_factory import IntegratedLoss
 import pytch.train.train_val as tv

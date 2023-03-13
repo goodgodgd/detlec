@@ -1,5 +1,4 @@
 import numpy as np
-from copy import deepcopy
 from pprint import PrettyPrinter
 import torch
 
@@ -14,15 +13,14 @@ class ModelTemplate(torch.nn.Module):
         self.output_names = [name for (name, module) in model_def.items() if module['output']]
         self.model_def = model_def
         self.modules = self.build(self.model_def)
-        pp = PrettyPrinter(sort_dicts=False)
-        pp.pprint(self.modules)
 
     def build(self, model_def):
         modules = {}
-        for name, part in model_def.items():
-            if isinstance(part, Input):
+        for name, module_def in model_def.items():
+            if isinstance(module_def, Input):
                 continue
-            modules[name] = part.get_module()
+            modules[name] = module_def.get_module()
+            setattr(self, name[1:], modules[name][1])
         return modules
 
     def forward(self, x):
@@ -60,16 +58,22 @@ class ModuleDefBase:
     def fill_default(self, bef_module):
         if 'out_channels' in bef_module:
             self['in_channels'] = bef_module['out_channels']
-        if 'in_channels' in self:
             self['out_channels'] = self['in_channels']
+        elif 'in_channels' in self:
+            del self.props['in_channels']
+            del self.props['out_channels']
         if 'out_features' in bef_module:
             self['in_features'] = bef_module['out_features']
-        if 'in_features' in self:
             self['out_features'] = self['in_features']
+        elif 'in_features' in self:
+            del self.props['in_features']
+            del self.props['out_features']
         if 'out_resol' in bef_module:
             self['in_resol'] = bef_module['out_resol']
-        if 'in_resol' in bef_module:
             self['out_resol'] = self['in_resol']
+        elif 'in_resol' in self:
+            del self.props['in_resol']
+            del self.props['out_resol']
 
     def append_name_prefix(self, prefix):
         if prefix is None:
@@ -294,13 +298,13 @@ class ModelDefFactory(BlockModuleDefBase):
             Classifier('clsf', in_name='bkbn/conv2/relu', num_class=10)
         ]
         self.model_def = self.fill_and_append({})
-        print("final model", self)
+        print(self)
 
     def get_model_def(self):
         return self.model_def
 
     def __str__(self):
-        text = "Model{\n"
+        text = "[ModelDefFactory] Model{\n"
         for index, (name, module_def) in enumerate(self.model_def.items()):
             text += f"\t{index:02}: {module_def}\n"
         text += '}'

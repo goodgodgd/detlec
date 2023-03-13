@@ -73,7 +73,7 @@ class ModelTrainer(TrainValBase):
         total_loss, loss_by_type = self.loss_object(y_batch, y_pred)
         total_loss.backward()
         self.optimizer.step()
-        self.correct_count += torch.sum(torch.argmax(y_pred['linear2/softmax'], dim=1) == y_batch)
+        self.correct_count += torch.sum(torch.argmax(y_pred['/clsf/linear2/softmax'], dim=1) == y_batch)
         self.total_count += y_batch.shape[0]
         return y_pred, total_loss, loss_by_type
 
@@ -88,7 +88,7 @@ class ModelValidater(TrainValBase):
         x_batch, y_batch = features
         y_pred = self.model(x_batch)
         total_loss, loss_by_type = self.loss_object(y_batch, y_pred)
-        self.correct_count += torch.sum(torch.argmax(y_pred['linear2/softmax'], dim=1) == y_batch)
+        self.correct_count += torch.sum(torch.argmax(y_pred['/clsf/linear2/softmax'], dim=1) == y_batch)
         self.total_count += y_batch.shape[0]
         return y_pred, total_loss, loss_by_type
 

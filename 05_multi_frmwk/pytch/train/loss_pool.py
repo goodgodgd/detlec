@@ -127,7 +127,7 @@ class ClassifierLoss(LossBase):
 
     def __call__(self, grtr, pred, scale):
         celoss = torch.nn.CrossEntropyLoss(reduction='none', label_smoothing=0.05)
-        ctgr_loss = celoss(pred['linear2/softmax'], grtr)  # (batch, AHW)
+        ctgr_loss = celoss(pred['/clsf/linear2/softmax'], grtr)  # (batch, AHW)
         scalar_loss = torch.sum(ctgr_loss)
         return scalar_loss, ctgr_loss
 
