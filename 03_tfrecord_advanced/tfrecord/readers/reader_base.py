@@ -43,3 +43,10 @@ class DatasetReaderBase:
         :return: bounding box in the indexed image (y, x, h, w, category_index), np.int32
         """
         raise NotImplementedError()
+
+    def get_categories(self, index):
+        """
+        :param index: image index in self.frame_names
+        :return: category ids
+        """
+        raise NotImplementedError()

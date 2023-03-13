@@ -77,35 +77,23 @@ def tf2_keras_classifier():
     test_model(model, test_data)
 
 
-def create_model(dataset, use_add=True):
+def create_model(dataset):
     x, y = dataset
     input_shape = x.shape[1:]
     num_class = tf.reduce_max(y).numpy() + 1
     print(f"[create_model] input shape={input_shape}, num_class={num_class}")
 
-    if use_add:
-        model = keras.Sequential(name="tf-classifier")
-        model.add(layers.Input(shape=input_shape))
-        model.add(layers.Conv2D(filters=32, kernel_size=3, padding="same", activation="relu", name="conv1"))
-        model.add(layers.MaxPool2D(pool_size=(2, 2), name="pooling1"))
-        model.add(layers.Conv2D(filters=64, kernel_size=3, padding="same", activation="relu", name="conv2"))
-        model.add(layers.MaxPool2D(pool_size=(2, 2), name="pooling2"))
-        model.add(layers.Flatten(name="flatten"))
-        model.add(layers.Dense(units=100, activation="relu", name="dense1"))
-        model.add(keras.layers.Dropout(0.2))
-        model.add(layers.Dense(units=num_class, activation="softmax", name="dense2"))
-    else:
-        model = keras.Sequential([
-            layers.Conv2D(filters=32, kernel_size=3, padding="same", activation="relu", input_shape=input_shape, name="conv1"),
-            layers.MaxPool2D(pool_size=(2, 2), name="pooling1"),
-            layers.Conv2D(filters=64, kernel_size=3, padding="same", activation="relu", name="conv2"),
-            layers.MaxPool2D(pool_size=(2, 2), name="pooling2"),
-            layers.Flatten(name="flatten"),
-            layers.Dense(units=100, activation="relu", name="dense1"),
-            keras.layers.Dropout(0.2),
-            layers.Dense(units=num_class, activation="softmax", name="dense2"),
-            ],
-            name="tf-classifier")
+    model = keras.Sequential([
+        layers.Conv2D(filters=32, kernel_size=3, padding="same", activation="relu", input_shape=input_shape, name="conv1"),
+        layers.MaxPool2D(pool_size=(2, 2), name="pooling1"),
+        layers.Conv2D(filters=64, kernel_size=3, padding="same", activation="relu", name="conv2"),
+        layers.MaxPool2D(pool_size=(2, 2), name="pooling2"),
+        layers.Flatten(name="flatten"),
+        layers.Dense(units=100, activation="relu", name="dense1"),
+        keras.layers.Dropout(0.2),
+        layers.Dense(units=num_class, activation="softmax", name="dense2"),
+        ],
+        name="tf-classifier")
     model.summary()
     keras.utils.plot_model(model, "tf-clsf-model.png")
     return model

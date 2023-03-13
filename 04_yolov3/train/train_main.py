@@ -5,11 +5,10 @@ import numpy as np
 import pandas as pd
 
 import settings
-from config import Config as cfg
+import config as cfg
 from tfrecord.tfrecord_reader import TfrecordReader
 from model.model_factory import ModelFactory
 from train.loss_factory import IntegratedLoss
-from train.logger import LogFile
 import train.train_val as tv
 import utils.util_function as uf
 
@@ -25,28 +24,25 @@ def train_main():
 def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_save):
     batch_size, train_mode = cfg.Train.BATCH_SIZE, cfg.Train.MODE
     tfrd_path, ckpt_path = cfg.Paths.TFRECORD, op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
-    valid_category = cfg.get_valid_category_mask(dataset_name)
     start_epoch = read_previous_epoch(ckpt_path)
     if end_epoch <= start_epoch:
         print(f"!! end_epoch {end_epoch} <= start_epoch {start_epoch}, no need to train")
         return
 
-    dataset_train, train_steps, imshape, anchors_per_scale = \
+    dataset_train, train_steps, imshape = \
         get_dataset(tfrd_path, dataset_name, False, batch_size, "train")
-    dataset_val, val_steps, _, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
+    dataset_val, val_steps, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
 
-    model, loss_object, optimizer = create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path,
-                                                          learning_rate, loss_weights, valid_category)
-    trainer = tv.trainer_factory(train_mode, model, loss_object, optimizer, train_steps)
-    validater = tv.validater_factory(train_mode, model, loss_object, val_steps)
-    log_file = LogFile()
+    model, loss_object, optimizer = create_training_parts(batch_size, imshape, ckpt_path,
+                                                          learning_rate, loss_weights)
+    trainer = tv.trainer_factory(train_mode, model, loss_object, train_steps, ckpt_path, optimizer)
+    validater = tv.validater_factory(train_mode, model, loss_object, val_steps, ckpt_path)
 
     for epoch in range(start_epoch, end_epoch):
         print(f"========== Start dataset : {dataset_name} epoch: {epoch + 1}/{end_epoch} ==========")
-        train_result = trainer.run_epoch(dataset_train)
-        val_result = validater.run_epoch(dataset_val)
+        trainer.run_epoch(dataset_train, epoch, False)
+        validater.run_epoch(dataset_val, epoch, epoch%5==0 or epoch%5==4)
         save_model_ckpt(ckpt_path, model)
-        log_file.save_log(epoch, train_result, val_result)
 
     if model_save:
         save_model_ckpt(ckpt_path, model, f"ep{end_epoch:02d}")
@@ -59,20 +55,16 @@ def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
     frames = reader.get_total_frames()
     tfr_cfg = reader.get_tfr_config()
     image_shape = tfr_cfg["image"]["shape"]
-    # anchor sizes per scale in pixel
-    anchors_per_scale = {key: np.array(val) / np.array([image_shape[:2]]) for key, val in tfr_cfg.items() if key.startswith("anchor")}
-    anchors_per_scale = {key: val.astype(np.float32) for key, val in anchors_per_scale.items()}
-    print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, "
-          f"frames={frames},\n\tanchors={anchors_per_scale}")
-    return dataset, frames // batch_size, image_shape, anchors_per_scale
+    print(f"[get_dataset] dataset={dataset_name}, image shape={image_shape}, frames={frames}")
+    return dataset, frames // batch_size, image_shape
 
 
-def create_training_parts(batch_size, imshape, anchors_per_scale, ckpt_path, learning_rate,
-                          loss_weights, valid_category, weight_suffix='latest'):
-    model = ModelFactory(batch_size, imshape, anchors_per_scale).get_model()
+def create_training_parts(batch_size, imshape, ckpt_path, learning_rate,
+                          loss_weights, weight_suffix='latest'):
+    model = ModelFactory(batch_size, imshape).get_model()
     model = try_load_weights(ckpt_path, model, weight_suffix)
-    loss_object = IntegratedLoss(loss_weights, valid_category)
-    optimizer = tf.optimizers.Adam(lr=learning_rate)
+    loss_object = IntegratedLoss(loss_weights)
+    optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
     return model, loss_object, optimizer
 
 

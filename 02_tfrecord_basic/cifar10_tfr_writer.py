@@ -6,8 +6,8 @@ from glob import glob
 
 
 class Config:
-    RAW_DATA_PATH = "/home/ian/workspace/detlec/dataset/cifar-10-batches-py"
-    TFRECORD_PATH = "/home/ian/workspace/detlec/dataset/tfrecord"
+    RAW_DATA_PATH = "F:/work/dataset/cifar-10-batches-py"
+    TFRECORD_PATH = "F:/work/dataset/tfrecord"
     CLASS_NAMES = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     CIFAR_IMG_SHAPE = (32, 32, 3)
 
@@ -37,20 +37,20 @@ def load_cifar10_dataset(data_path, img_shape):
     train_labels = []
     train_images = []
     for file in train_files:
-        labels, images = read_data(file, img_shape)
+        labels, images = read_datafile(file, img_shape)
         train_labels += labels
         train_images.append(images)
     train_images = np.concatenate(train_images, axis=0)
 
     test_file = os.path.join(data_path, "test_batch")
-    test_labels, test_images = read_data(test_file, img_shape)
+    test_labels, test_images = read_datafile(test_file, img_shape)
 
     print("[load_cifar10_dataset] train image and label shape:", train_images.shape, len(train_labels))
     print("[load_cifar10_dataset] test image and label shape: ", test_images.shape, len(test_labels))
     return (train_images, train_labels), (test_images, test_labels)
 
 
-def read_data(file, img_shape):
+def read_datafile(file, img_shape):
     with open(file, 'rb') as fo:
         data = pickle.load(fo, encoding='bytes')
         labels = data[b"labels"]    # list of category indices, [10000], int
@@ -82,7 +82,7 @@ def make_tfrecord(dataset, dataname, split, class_names, tfr_path):
 
 
 def open_tfr_writer(writer, tfr_path, dataname, split, shard_index):
-    if writer:
+    if writer:    # close writer before open a new file
         writer.close()
 
     tfrdata_path = os.path.join(tfr_path, f"{dataname}_{split}")
@@ -145,5 +145,5 @@ class TfrSerializer:
 
 
 if __name__ == "__main__":
+    # test_serializer()
     write_cifar10_tfrecord()
-

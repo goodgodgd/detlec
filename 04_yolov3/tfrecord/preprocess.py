@@ -46,44 +46,38 @@ class ExampleCropper(PreprocessBase):
         source_hw = example["image"].shape[:2]
         crop_tlbr = self.find_crop_range(source_hw)
         image = self.crop_image(example["image"], crop_tlbr)
-        cropped_hw = image.shape[:2]
-        bboxes = self.crop_bboxes(example["bboxes"], crop_tlbr, cropped_hw)
-        return {"image": image, "bboxes": bboxes}
+        bboxes = self.crop_bboxes(example["inst"], crop_tlbr)
+        return {"image": image, "inst": bboxes}
 
-    def find_crop_range(self, src_hw):                      # example:
-        src_hw = np.array(src_hw, dtype=np.float32)         # [220, 540]
-        offset = np.array(self.crop_offset, dtype=np.int32) # [10, 20, 10, 20]
-        src_crop_hw = src_hw - (offset[:2] + offset[2:])    # [200, 500]
-        src_hw_ratio = src_crop_hw[1] / src_crop_hw[0]      # 2.5
-        dst_hw_ratio = self.target_hw_ratio                 # 2
-        if dst_hw_ratio < src_hw_ratio:                     # crop x-axis, dst_hw=[200, 400]
-            dst_hw = np.array([src_hw[0], src_hw[0] * dst_hw_ratio], dtype=np.int32)
+    def find_crop_range(self, src_hw):  # example:
+        src_hw = np.array(src_hw, dtype=np.float32)  # [220, 540]
+        offset = np.array(self.crop_offset, dtype=np.int32)  # [10, 20, 10, 20]
+        src_crop_hw = src_hw - (offset[:2] + offset[2:])  # [200, 500]
+        src_hw_ratio = src_crop_hw[1] / src_crop_hw[0]  # 2.5
+        dst_hw_ratio = self.target_hw_ratio  # 2
+        if dst_hw_ratio < src_hw_ratio:  # crop x-axis, dst_hw=[200, 400]
+            dst_hw = np.array([src_crop_hw[0], src_crop_hw[0] * dst_hw_ratio], dtype=np.int32)
         else:
-            dst_hw = np.array([src_hw[1] / dst_hw_ratio, src_hw[1]], dtype=np.int32)
+            dst_hw = np.array([src_crop_hw[1] / dst_hw_ratio, src_crop_hw[1]], dtype=np.int32)
         # crop with fixed center, ([200, 500]-[200, 400])/2 = [0, 50]
-        crop_yx = ((src_crop_hw - dst_hw) // 2).astype(np.int32)
+        addi_crop_yx = ((src_crop_hw - dst_hw) // 2).astype(np.int32)
         # crop top left bottom right, [10, 20, 10, 20] + [0, 50, 0, 50] = [10, 70, 10, 70]
-        crop_tlbr = offset + np.concatenate([crop_yx, crop_yx], axis=0)
+        crop_tlbr = offset + np.concatenate([addi_crop_yx, addi_crop_yx], axis=0)
+        # cropped image range, [10, 70, [220, 540]-[10, 70]] = [10, 70, 210, 470]
+        crop_tlbr = np.concatenate([crop_tlbr[:2], src_hw - crop_tlbr[2:]])
         return crop_tlbr
 
     def crop_image(self, image, crop_tlbr):
-        if crop_tlbr[0] > 0:
-            image = image[crop_tlbr[0]:]
-        if crop_tlbr[2] > 0:
-            image = image[:-crop_tlbr[2]]
-        if crop_tlbr[1] > 0:
-            image = image[:, crop_tlbr[1]:]
-        if crop_tlbr[3] > 0:
-            image = image[:, :-crop_tlbr[3]]
+        image = image[int(crop_tlbr[0]):int(crop_tlbr[2]), int(crop_tlbr[1]):int(crop_tlbr[3]), :]
         return image
 
-    def crop_bboxes(self, bboxes, crop_tlbr, cropped_hw):
+    def crop_bboxes(self, bboxes, crop_tlbr):
+        crop_hw = crop_tlbr[2:] - crop_tlbr[:2]
         # move image origin
-        bboxes[:, 0] = bboxes[:, 0] - crop_tlbr[0]
-        bboxes[:, 1] = bboxes[:, 1] - crop_tlbr[1]
+        bboxes[:, :2] = bboxes[:, :2] - crop_tlbr[:2]
         # filter boxes with centers outside image
-        inside = (bboxes[:, 0] >= 0) & (bboxes[:, 0] < cropped_hw[0]) & \
-                 (bboxes[:, 1] >= 0) & (bboxes[:, 1] < cropped_hw[1])
+        inside = (bboxes[:, 0] >= 0) & (bboxes[:, 0] < crop_hw[0]) & \
+                 (bboxes[:, 1] >= 0) & (bboxes[:, 1] < crop_hw[1])
         bboxes = bboxes[inside]
         if bboxes.size == 0:
             raise uc.MyExceptionToCatch("[get_bboxes] empty boxes")
@@ -91,15 +85,15 @@ class ExampleCropper(PreprocessBase):
         bboxes = uf.convert_box_format_yxhw_to_tlbr(bboxes)
         bboxes[:, 0] = np.maximum(bboxes[:, 0], 0)
         bboxes[:, 1] = np.maximum(bboxes[:, 1], 0)
-        bboxes[:, 2] = np.minimum(bboxes[:, 2], cropped_hw[0])
-        bboxes[:, 3] = np.minimum(bboxes[:, 3], cropped_hw[1])
+        bboxes[:, 2] = np.minimum(bboxes[:, 2], crop_hw[0])
+        bboxes[:, 3] = np.minimum(bboxes[:, 3], crop_hw[1])
         bboxes = uf.convert_box_format_tlbr_to_yxhw(bboxes)
         return bboxes
 
 
 class ExampleResizer(PreprocessBase):
     def __init__(self, target_hw):
-        self.target_hw = np.array(target_hw, dtype=np.float32)
+        self.target_hw = np.array(target_hw, dtype=np.int32)
     
     def __call__(self, example):
         source_hw = np.array(example["image"].shape[:2], dtype=np.float32)
@@ -107,10 +101,10 @@ class ExampleResizer(PreprocessBase):
         assert np.isclose(self.target_hw[0] / source_hw[0], self.target_hw[1] / source_hw[1], atol=0.001)
         # resize image
         image = cv2.resize(example["image"], (self.target_hw[1], self.target_hw[0]))  # (256, 832)
-        bboxes = example["bboxes"].astype(np.float32)
+        bboxes = example["inst"].astype(np.float32)
         # rescale yxhw
         bboxes[:, :4] *= resize_ratio
-        return {"image": image, "bboxes": bboxes}
+        return {"image": image, "inst": bboxes}
 
 
 class ExampleBoxScaler(PreprocessBase):
@@ -119,9 +113,9 @@ class ExampleBoxScaler(PreprocessBase):
     """
     def __call__(self, example):
         height, width = example["image"].shape[:2]
-        bboxes = example["bboxes"].astype(np.float32)
+        bboxes = example["inst"].astype(np.float32)
         bboxes[:, :4] /= np.array([height, width, height, width])
-        return {"image": example["image"], "bboxes": bboxes}
+        return {"image": example["image"], "inst": bboxes}
 
 
 class ExampleCategoryRemapper(PreprocessBase):
@@ -144,14 +138,14 @@ class ExampleCategoryRemapper(PreprocessBase):
         return remap
 
     def __call__(self, example):
-        old_categs = example["bboxes"][:, 4]
+        old_categs = example["inst"][:, 5]
         new_categs = old_categs.copy()
         # replace category indices by category_remap
         for key, val in self.category_remap.items():
             new_categs[old_categs == key] = val
-        example["bboxes"][:, 4] = new_categs
+        example["inst"][:, 5] = new_categs
         # filter out invalid category
-        example["bboxes"] = example["bboxes"][new_categs != self.INVALID_CATEGORY, :]
+        example["inst"] = example["inst"][new_categs != self.INVALID_CATEGORY, :]
         return example
 
 
@@ -160,11 +154,11 @@ class ExampleZeroPadBbox(PreprocessBase):
         self.max_bbox = max_bbox
 
     def __call__(self, example):
-        bboxes = example["bboxes"]
+        bboxes = example["inst"]
         if bboxes.shape[0] < self.max_bbox:
-            new_bboxes = np.zeros((self.max_bbox, 5), dtype=np.float32)
+            new_bboxes = np.zeros((self.max_bbox, bboxes.shape[-1]), dtype=np.float32)
             new_bboxes[:bboxes.shape[0]] = bboxes
-            example["bboxes"] = new_bboxes
+            example["inst"] = new_bboxes
         return example
 
 

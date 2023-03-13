@@ -5,27 +5,24 @@ import utils.util_function as uf
 
 
 class LossBase:
-    def __call__(self, grtr, pred, auxi):
-        dummy_large = tf.reduce_mean(tf.square(pred["feature_l"]))
-        dummy_medium = tf.reduce_mean(tf.square(pred["feature_m"]))
-        dummy_small = tf.reduce_mean(tf.square(pred["feature_s"]))
-        dummy_total = dummy_large + dummy_medium + dummy_small
-        return dummy_total, {"dummy_large": dummy_large, "dummy_medium": dummy_medium, "dummy_small": dummy_small}
+    def __call__(self, grtr, pred, scale):
+        dummy = [tf.reduce_mean(tf.square(fmap)) for fmap in pred["fmap"]]
+        total = tf.reduce_sum(dummy)
+        return total, dummy
 
 
 class CiouLoss(LossBase):
-    def __call__(self, grtr, pred, auxi):
+    def __call__(self, grtr, pred, scale):
         """
-        :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, dim), ...}
-        :param pred: dict of merged pred. feature map slices, {key: (batch, HWA, dim), ...}
-        :param auxi: auxiliary data
+        :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, channel), ...}
+        :param pred: dict of merged pred. feature map slices, {key: (batch, HWA, channel), ...}
+        :param scale: scale index
         :return: complete-iou loss (batch, HWA)
         """
         # object_mask: (batch, HWA, 1), object_count: scalar
-        object_mask, object_count = grtr["object"], auxi["object_count"]
-        ciou_loss = self.compute_ciou(pred["bbox"], grtr["bbox"])
+        ciou_loss = self.compute_ciou(pred["yxhw"][scale], grtr["yxhw"][scale])
         # average over object-containing grid cells
-        scalar_loss = tf.reduce_sum(object_mask[..., 0] * ciou_loss) / object_count
+        scalar_loss = tf.reduce_sum(grtr["object"][scale][..., 0] * ciou_loss)
         return scalar_loss, ciou_loss
 
     def compute_ciou(self, grtr_yxhw, pred_yxhw):
@@ -61,51 +58,50 @@ class CiouLoss(LossBase):
 
 
 class ObjectnessLoss(LossBase):
-    def __call__(self, grtr, pred, auxi):
+    def __call__(self, grtr, pred, scale):
         """
-        :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, dim), ...}
-        :param pred: dict of merged pred. feature map slices, {key: (batch, HWA, dim), ...}
-        :param auxi: auxiliary data
+        :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, channel), ...}
+        :param pred: dict of merged pred. feature map slices, {key: (batch, HWA, channel), ...}
+        :param scale: scale index
         :return: objectness loss (batch, HWA)
         """
-        grtr_obj = grtr["object"]
-        pred_obj = pred["object"]
+        grtr_obj = grtr["object"][scale]
+        pred_obj = pred["object"][scale]
         # object_mask: (batch, HWA, 1), object_count: scalar
-        object_mask, object_count = grtr["object"][..., 0], auxi["object_count"]
+        object_mask = grtr["object"][scale][..., 0]
         # objectness loss
         obj_loss = tf.keras.losses.binary_crossentropy(grtr_obj, pred_obj)
-        # to equally weight positive and negative samples, average them separately
-        obj_positive = tf.reduce_sum(obj_loss * object_mask) / object_count
-        negative_count = tf.cast(tf.size(object_mask), tf.float32) - object_count
-        obj_negative = tf.reduce_sum(obj_loss * (1. - object_mask)) / negative_count
+        # apply different weights on positive and negative samples
+        obj_positive = tf.reduce_sum(obj_loss * object_mask)
+        obj_negative = tf.reduce_sum(obj_loss * (1. - object_mask)) * 4.
         scalar_loss = obj_positive + obj_negative
         return scalar_loss, obj_loss
 
 
 class CategoryLoss(LossBase):
-    def __call__(self, grtr, pred, auxi):
+    def __init__(self, num_ctgr):
+        super().__init__()
+        self.num_ctgr = num_ctgr
+
+    def __call__(self, grtr, pred, scale):
         """
-        :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, dim), ...}
-        :param pred: dict of merged pred. feature map slices, {key: (batch, HWA, dim), ...}
-        :param auxi: auxiliary data
+        :param grtr: dict of merged GT feature map slices, {key: (batch, HWA, channel), ...}
+        :param pred: dict of merged pred. feature map slices, {key: (batch, HWA, channel), ...}
+        :param scale: scale index
         :return: category loss (batch, HWA, K)
         """
-        grtr_cate = grtr["category"][..., 0]            # (batch, HWA)
-        pred_cate = pred["category"][..., tf.newaxis]   # (batch, HWA, K, 1)
+        grtr_cate = grtr["category"][scale][..., 0]            # (batch, HWA)
+        pred_cate = pred["category"][scale][..., tf.newaxis]   # (batch, HWA, K, 1)
         # object_mask: (batch, HWA, 1), object_count: scalar, valid_category: (K)
-        object_mask, object_count, valid_category = grtr["object"], auxi["object_count"], auxi["valid_category"]
-        grtr_cate_indices = tf.cast(grtr_cate, dtype=tf.int32)
+        object_mask = grtr["object"][scale]
+        grtr_ctgr_indices = tf.cast(grtr_cate, dtype=tf.int32)
         # (batch, HWA, K, 1)
-        grtr_cate_onehot = tf.one_hot(grtr_cate_indices, depth=valid_category.shape[0], axis=-1)[..., tf.newaxis]
-
+        grtr_ctgr_onehot = tf.one_hot(grtr_ctgr_indices, depth=self.num_ctgr, axis=-1)[..., tf.newaxis]
         # category loss: binary cross entropy per category for multi-label classification (batch, HWA, K)
-        cate_loss = tf.keras.losses.binary_crossentropy(grtr_cate_onehot, pred_cate, label_smoothing=0.05)
-        valid_category = tf.reshape(valid_category, (1, 1, valid_category.shape[0]))
-        valid_category = tf.cast(valid_category, tf.float32)
-        cate_loss = cate_loss * valid_category
-        # cate_loss_reduced: (batch, HWA, 1)
-        cate_loss_reduced = tf.reduce_sum(cate_loss, axis=-1, keepdims=True) / tf.reduce_sum(valid_category)
-        scalar_loss = tf.reduce_sum(cate_loss_reduced * object_mask) / object_count
-        return scalar_loss, cate_loss
+        ctgr_loss = tf.keras.losses.binary_crossentropy(grtr_ctgr_onehot, pred_cate, label_smoothing=0.05)
+        # ctgr_loss_reduced: (batch, HWA, 1)
+        ctgr_loss_reduced = tf.reduce_sum(ctgr_loss, axis=-1, keepdims=True)
+        scalar_loss = tf.reduce_sum(ctgr_loss_reduced * object_mask)
+        return scalar_loss, ctgr_loss
 
 

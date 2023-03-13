@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
 
-from config import Config as cfg
+import config as cfg
 from tfrecord.tfrecord_writer import TfrecordMaker
 import settings
 

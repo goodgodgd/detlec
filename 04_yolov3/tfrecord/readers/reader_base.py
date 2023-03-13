@@ -15,9 +15,9 @@ class DriveManagerBase:
 
 
 class DatasetReaderBase:
-    def __init__(self, drive_path, split, categories):
+    def __init__(self, drive_path, split, dataset_cfg):
         self.frame_names = self.init_drive(drive_path, split)
-        self.categories = categories
+        self.dataset_cfg = dataset_cfg
 
     def init_drive(self, drive_path, split):
         """
@@ -41,5 +41,12 @@ class DatasetReaderBase:
         """
         :param index: image index in self.frame_names
         :return: bounding box in the indexed image (y, x, h, w, category_index), np.int32
+        """
+        raise NotImplementedError()
+
+    def get_categories(self, index):
+        """
+        :param index: image index in self.frame_names
+        :return: category ids
         """
         raise NotImplementedError()
