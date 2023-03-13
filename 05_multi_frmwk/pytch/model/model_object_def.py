@@ -5,20 +5,6 @@ import torch
 
 import config as cfg
 
-class NamePool:
-    count = 0
-    names = {}
-
-    @staticmethod
-    def new_key(name: str):
-        NamePool.count += 1
-        NamePool.names[NamePool.count] = name
-        return NamePool.count
-
-    @staticmethod
-    def get_name(key: int):
-        return NamePool.names[key]
-
 
 class ModelTemplate(torch.nn.Module):
     def __init__(self, architecture, input_shape=(3, 320, 320)):
@@ -42,7 +28,6 @@ class ModelTemplate(torch.nn.Module):
     def forward(self, x):
         module_outputs = {self.input_names[0]: x}
         for name, (input_gen, module) in self.modules.items():
-            print("module outputs" ,module_outputs.keys())
             input_tensor = input_gen(self.model_def[name]['in_name'], module_outputs)
             module_outputs[name] = module(input_tensor)
         model_output = {name: module_outputs[name] for name in self.output_names}
