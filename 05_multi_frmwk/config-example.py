@@ -4,7 +4,7 @@ import numpy as np
 
 
 class Paths:
-    RESULT_ROOT = "F:/work/result"
+    RESULT_ROOT = "/home/ri-bear/workspace/result"
     TFRECORD = op.join(RESULT_ROOT, "tfrecord")
     CHECK_POINT = op.join(RESULT_ROOT, "ckpt")
 
@@ -13,11 +13,14 @@ class Datasets:
     # specific dataset configs MUST have the same items
     class Kitti:
         NAME = "kitti"
-        PATH = "F:/work/dataset/kitti"
+        PATH = "/home/ri-bear/workspace/dataset/kitti"
         CATEGORIES_TO_USE = ["Pedestrian", "Car", "Van", "Truck", "Cyclist"]
         CATEGORY_REMAP = {"Pedestrian": "Person", "Cyclist": "Bicycle"}
         INPUT_RESOLUTION = (256, 832)   # (4,13) * 64
         CROP_TLBR = [0, 0, 0, 0]        # crop [top, left, bottom, right] or [y1 x1 y2 x2]
+
+    class Cifar10:
+        DOWNLOAD_PATH = "/home/ri-bear/workspace/dataset/cifar10"
 
     DATASET_CONFIGS = {"kitti": Kitti}
     TARGET_DATASET = "kitti"
@@ -40,6 +43,7 @@ class ModelOutput:
     GRTR_FMAP_COMPOSITION = {"yxhw": 4, "object": 1, "category": 1}
     PRED_FMAP_COMPOSITION = {"yxhw": 4, "object": 1, "category": len(DataCommon.CATEGORY_NAMES)}
     ANCHORS_RATIO = None  # assigned by update_anchors()
+    TP_IOU_THRESH = [0.5, 0.5, 0.5, 0.5]
 
 
 class Architecture:
@@ -50,10 +54,10 @@ class Architecture:
 
 
 class Train:
-    CKPT_NAME = "yolo2"
+    CKPT_NAME = "refac0314"
     MODE = ["eager", "graph"][1]
-    BATCH_SIZE = 2
-    TRAINING_PLAN = params.TrainingPlan.KITTI_SIMPLE
+    BATCH_SIZE = 8
+    TRAINING_PLAN = params.TrainingPlan.CIFAR10
 
 
 class NmsInfer:
