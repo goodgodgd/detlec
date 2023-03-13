@@ -1,88 +1,144 @@
-import torch.nn
-import torch.nn as nn
-import torch.nn.functional as F
+from pprint import PrettyPrinter
+import torch
 
-import pytch.model.model_definition as pmd
 import config as cfg
+from pytch.model.basic_module_def import *
+
+IN_NAMES = ModuleDefBase.INPUT_NAMES
 
 
-class Classifier(nn.Module):
-    def __init__(self):
+class ModelTemplate(torch.nn.Module):
+    def __init__(self, architecture, input_shape=(3, 320, 320)):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1, padding_mode='zeros')
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(32, 64, 3, padding=1, padding_mode='zeros')
-        self.pool2 = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64 * 8 * 8, 100)
-        self.fc2 = nn.Linear(100, 10)
-        self.softmax = nn.Softmax()
+        model_def = ModelDefFactory(architecture, input_shape).get_model_def()
+        self.input_names = [name for (name, module) in model_def.items() if isinstance(module, Input)]
+        self.output_names = [name for (name, module) in model_def.items() if module['output']]
+        self.model_def = model_def
+        self.modules = self.build(self.model_def)
 
-    def forward(self, x):
-        x = self.pool1(F.relu(self.conv1(x)))
-        x = self.pool2(F.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 8 * 8)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x)
-        x = F.softmax(self.fc2(x), dim=1)
-        return x
-
-
-
-class ModelTemplate(nn.Module):
-    def __init__(self, architecture=cfg.Architecture, imshape=(3,320,320)):
-        super().__init__()
-        self.model_def = pmd.ModelAssembler(architecture, imshape).get_model_def()
-        self.modules = self.build()
-        self.input_names = [name for (name, module) in self.model_def.items() if module['type'] == 'input']
-        self.output_names = [name for (name, module) in self.model_def.items() if 'output' in module and module['output'] is True]
-
-    def build(self):
+    def build(self, model_def):
         modules = {}
-        for name, module_def in self.model_def.items():
-            if module_def['type'] == 'conv2d':
-                args = {key: module_def[key] for key in ['in_channels', 'out_channels', 'kernel_size', 'padding']}
-                modules[name] = (self.single_input, torch.nn.Conv2d(**args))
-            elif module_def['type'] == 'maxpool':
-                args = {key: module_def[key] for key in ['kernel_size', 'stride']}
-                modules[name] = (self.single_input, torch.nn.MaxPool2d(**args))
-            elif module_def['type'] == 'add':
-                modules[name] = (self.multi_input, lambda x: x[0] + x[1])
-            elif module_def['type'] == 'relu':
-                modules[name] = (self.single_input, torch.nn.ReLU())
-            elif module_def['type'] == 'flatten':
-                out_channels = module_def['out_channels']
-                modules[name] = (self.single_input, lambda x: x.view(-1, out_channels))
-            elif module_def['type'] == 'linear':
-                key_map = {'in_channels': 'in_features', 'out_channels': 'out_features'}
-                args = {key_map[key]: module_def[key] for key in ['in_channels', 'out_channels']}
-                modules[name] = (self.single_input, torch.nn.Linear(**args))
-            elif module_def['type'] == 'softmax':
-                modules[name] = (self.single_input, torch.nn.Softmax(dim=self.model_def[name]['dim']))
-            elif module_def['type'] == 'input':
+        for name, module_def in model_def.items():
+            if isinstance(module_def, Input):
                 continue
-            else:
-                assert 0, f"No module type {module_def['type']} is defined"
-            setattr(self, name, modules[name][1])
+            modules[name] = module_def.get_module()
+            setattr(self, name[1:], modules[name][1])
         return modules
-
-    def single_input(self, src_name, prior_outputs):
-        return prior_outputs[src_name]
-
-    def multi_input(self, src_names, prior_outputs):
-        x =  [prior_outputs[src] for src in src_names]
-        return x
 
     def forward(self, x):
         module_outputs = {self.input_names[0]: x}
         for name, (input_gen, module) in self.modules.items():
-            input_tensor = input_gen(self.model_def[name]['input'], module_outputs)
+            input_tensor = input_gen(self.model_def[name]['in_name'], module_outputs)
             module_outputs[name] = module(input_tensor)
         model_output = {name: module_outputs[name] for name in self.output_names}
         return model_output
 
 
+class BlockModuleDefBase(ModuleDefBase):
+    def __init__(self, name, in_name=None):
+        super().__init__()
+        if name is not None:
+            self.props['name'] = name
+        if in_name is not None:
+            self.props['in_name'] = in_name
+        self.block_def = []
+
+    def fill_and_append(self, building_modules):
+        for module_def in self.block_def:
+            module_def.append_name_prefix(self['name'])
+            if 'in_name' in self:
+                module_def.propagate_in_name(self['in_name'])
+            building_modules = module_def.fill_and_append(building_modules)
+        return building_modules
+
+    def __str__(self):
+        text = self.__class__.__name__ + '={\n'
+        text += f"\tname: {self['name']}\n"
+        if 'in_name' in self:
+            text += f"\tin_name: {self['in_name']}\n"
+        for index, (module_def) in enumerate(self.block_def):
+            text += f"\t{index:02}, {module_def}\n"
+        text += '}'
+        return text
+
+
+class ModelDefFactory(BlockModuleDefBase):
+    def __init__(self, architecture, src_shape):
+        super().__init__('')    # top name must be ''(empty) or start with '/' e.g. '/model'
+        self.block_def = [
+            Input('image', chw_shape=src_shape),
+            ResNet1('bkbn', in_name='image', out_channels=64),
+            Classifier('clsf', in_name='bkbn/conv2/relu', num_class=10)
+        ]
+        self.model_def = self.fill_and_append({})
+        print(self)
+
+    def get_model_def(self):
+        return self.model_def
+
+    def __str__(self):
+        text = "[ModelDefFactory] Model{\n"
+        for index, (name, module_def) in enumerate(self.model_def.items()):
+            text += f"\t{index:02}: {module_def}\n"
+        text += '}'
+        return text
+
+
+class ResNet1(BlockModuleDefBase):
+    def __init__(self, name, in_name, out_channels):
+        super().__init__(name, in_name)
+        self.block_def = [
+            Conv2d('conv1', in_name=IN_NAMES[0], out_channels=32),
+            Activation('conv1/relu', function='relu', in_name='conv1'),
+            MaxPool2d('pool1', in_name='conv1/relu', kernel_size=2, stride=2),
+            ResBlock('resblock1', in_name='conv1/relu'),
+            ResBlock('resblock2', in_name='conv1/relu'),
+            MaxPool2d('pool2', in_name='resblock2/add', kernel_size=2, stride=2),
+            Conv2d('conv2', in_name='pool2', out_channels=out_channels),
+            Activation('conv2/relu', function='relu', in_name='conv2'),
+        ]
+
+
+class ResBlock(BlockModuleDefBase):
+    def __init__(self, name, in_name):
+        super().__init__(name, in_name)
+        self.block_def = [
+            Conv2d('conv1', in_name=IN_NAMES[0]),
+            Activation('conv1/relu', function='relu', in_name='conv1'),
+            Conv2d('conv2', in_name='conv1/relu'),
+            Activation('conv2/relu', function='relu', in_name='conv2'),
+            Arithmetic('add', function='add', in_name=[IN_NAMES[0], 'conv2/relu'])
+        ]
+
+    def fill_and_append(self, building_modules):
+        bef_module = building_modules[self['in_name']]
+        out_channels = bef_module['out_channels']
+        self.block_def[0]['out_channels'] = out_channels // 2
+        self.block_def[2]['out_channels'] = out_channels
+        for module_def in self.block_def:
+            module_def.append_name_prefix(self['name'])
+            if 'in_name' in self:
+                module_def.propagate_in_name(self['in_name'])
+            building_modules = module_def.fill_and_append(building_modules)
+        return building_modules
+
+
+class Classifier(BlockModuleDefBase):
+    def __init__(self, name, in_name, num_class):
+        super().__init__(name, in_name)
+        self.block_def = [
+            Flatten('flatten', in_name=IN_NAMES[0]),
+            Linear('linear1', in_name='flatten', out_features=100),
+            Activation('linear1/relu', function='relu', in_name='linear1'),
+            Linear('linear2', in_name='linear1/relu', out_features=num_class, output=True),
+            Activation('linear2/softmax', function='softmax', in_name='linear2', dim=-1, output=True),
+        ]
+
+
 if __name__ == "__main__":
-    cnn = ModelTemplate()
+    model = ModelTemplate(cfg.Architecture)
     x = torch.rand((2, 3, 320, 320), dtype=torch.float32)
-    y = cnn(x)
-    print("cnn output", y['linear2/softmax'].shape)
+    y = model(x)
+    print("model outputs:")
+    for k, v in y.items():
+        print(f"\t{k}: {v.shape}")
