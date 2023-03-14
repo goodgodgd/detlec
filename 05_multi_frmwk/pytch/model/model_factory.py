@@ -44,12 +44,45 @@ class BlockModuleDefBase(ModuleDefBase):
         self.block_def = []
 
     def fill_and_append(self, building_modules):
+        self.out_name_to_in_name()
         for module_def in self.block_def:
             module_def.append_name_prefix(self['name'])
             if 'in_name' in self:
                 module_def.propagate_in_name(self['in_name'])
             building_modules = module_def.fill_and_append(building_modules)
         return building_modules
+
+    def out_name_to_in_name(self):
+        block_def_dict = {}
+        for module_def in self.block_def:
+            block_def_dict[module_def['name']] = module_def
+            if 'in_name' not in module_def:
+                continue
+
+            cur_in_names = module_def['in_name']
+            if isinstance(cur_in_names, str):
+                cur_in_names = [cur_in_names]
+
+            new_in_names = []
+            for in_name in cur_in_names:
+                if in_name in block_def_dict:
+                    bef_block_def = block_def_dict[in_name]
+                    if 'out_name' in bef_block_def:
+                        new_in_names.append(bef_block_def.get_out_name())
+                    else:
+                        new_in_names.append(in_name)
+                else:
+                    new_in_names.append(in_name)
+
+            if len(new_in_names) == 1:
+                new_in_names = new_in_names[0]
+            module_def['in_name'] = new_in_names
+
+    def get_out_name(self):
+        if isinstance(self['out_name'], list):
+            return [self['name'] + '/' + out_name for out_name in self['out_name']]
+        else:
+            return self['name'] + '/' + self['out_name']
 
     def __str__(self):
         text = self.__class__.__name__ + '={\n'
@@ -63,15 +96,33 @@ class BlockModuleDefBase(ModuleDefBase):
 
 
 class ModelDefFactory(BlockModuleDefBase):
-    def __init__(self, architecture, src_shape):
+    def __init__(self, architecture, chw_shape):
         super().__init__('')    # top name must be ''(empty) or start with '/' e.g. '/model'
-        self.block_def = [
-            Input('image', chw_shape=src_shape),
-            ResNet1('bkbn', in_name='image', out_channels=64),
-            Classifier('clsf', in_name='bkbn/conv2/relu', num_class=10)
-        ]
+        self.block_def = self.define_block_def(architecture, chw_shape)
         self.model_def = self.fill_and_append({})
         print(self)
+
+    def define_block_def(self, architecture, chw_shape):
+        block_def = [Input('image', chw_shape),
+                     ResNet1('resnet1', in_name='image', out_channels=64),
+                     Classifier('classifier', in_name='resnet1', num_class=10)
+                     ]
+
+        # if architecture.BACKBONE.lower() == 'darknet53':
+        #     block_def.append(Darknet53('darknet53', in_name='image'))
+        # elif architecture.BACKBONE.lower() == 'resnet1':
+        #     block_def.append(ResNet1('resnet1', in_name='image', out_channels=64))
+        # else:
+        #     raise ValueError(f"[define_block_def] {architecture.BACKBONE} is NOT implemented")
+        #
+        # if architecture.HEAD.lower() == 'FPN':
+        #     block_def.append(FPN('FPN', in_name='darknet53'))
+        # elif architecture.HEAD.lower() == 'classifier':
+        #     block_def.append(Classifier('classifier', in_name='resnet1', num_class=10))
+        # else:
+        #     raise ValueError(f"[define_block_def] {architecture.BACKBONE} is NOT implemented")
+
+        return block_def
 
     def get_model_def(self):
         return self.model_def
@@ -97,6 +148,7 @@ class ResNet1(BlockModuleDefBase):
             Conv2d('conv2', in_name='pool2', out_channels=out_channels),
             Activation('conv2/relu', function='relu', in_name='conv2'),
         ]
+        self['out_name'] = 'conv2/relu'
 
 
 class ResBlock(BlockModuleDefBase):
@@ -109,18 +161,14 @@ class ResBlock(BlockModuleDefBase):
             Activation('conv2/relu', function='relu', in_name='conv2'),
             Arithmetic('add', function='add', in_name=[IN_NAMES[0], 'conv2/relu'])
         ]
+        self['out_name'] = 'add'
 
     def fill_and_append(self, building_modules):
         bef_module = building_modules[self['in_name']]
         out_channels = bef_module['out_channels']
         self.block_def[0]['out_channels'] = out_channels // 2
         self.block_def[2]['out_channels'] = out_channels
-        for module_def in self.block_def:
-            module_def.append_name_prefix(self['name'])
-            if 'in_name' in self:
-                module_def.propagate_in_name(self['in_name'])
-            building_modules = module_def.fill_and_append(building_modules)
-        return building_modules
+        return super(ResBlock, self).fill_and_append(building_modules)
 
 
 class Classifier(BlockModuleDefBase):
@@ -133,6 +181,7 @@ class Classifier(BlockModuleDefBase):
             Linear('linear2', in_name='linear1/relu', out_features=num_class, output=True),
             Activation('linear2/softmax', function='softmax', in_name='linear2', dim=-1, output=True),
         ]
+        self['out_name'] = 'linear2/softmax'
 
 
 if __name__ == "__main__":
