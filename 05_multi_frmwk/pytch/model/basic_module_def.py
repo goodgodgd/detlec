@@ -4,6 +4,8 @@ import torch
 
 class ModuleDefBase:
     INPUT_NAMES = ['input0', 'input1', 'input2']
+    CLASS_COUNT = {}
+    NAMESPACE = ''
 
     def __init__(self):
         self.args = []
@@ -85,12 +87,25 @@ class ModuleDefBase:
             if self['in_name'] in replacement:
                 self['in_name'] = replacement[self['in_name']]
 
+    def make_sure_have_name(self):
+        class_name = self.NAMESPACE + self.__class__.__name__
+        if class_name not in self.CLASS_COUNT:
+            self.CLASS_COUNT[class_name] = 0
+        self.CLASS_COUNT[class_name] += 1
+        if 'name' in self and self['name'] is not None:
+            return
+        if self.NAMESPACE:
+            print("class name", self.NAMESPACE, class_name, self.CLASS_COUNT[class_name])
+        name_prefix = self['alias'] if 'alias' in self else class_name
+        self['name'] = f"{name_prefix}{self.CLASS_COUNT[class_name]}"
+
 
 class Input(ModuleDefBase):
     def __init__(self, name, chw_shape, output=False):
         super().__init__()
         out_resol = np.array(chw_shape[1:], dtype=np.int32)
-        self.props = {'name': name, 'out_channels': chw_shape[0], 'out_resol': out_resol, 'output': output}
+        self.props = {'name': name, 'out_channels': chw_shape[0],
+                      'out_resol': out_resol, 'output': output, 'alias': 'input'}
 
     def fill_and_append(self, building_modules):
         building_modules[self['name']] = self
@@ -98,11 +113,11 @@ class Input(ModuleDefBase):
 
 
 class Conv2d(ModuleDefBase):
-    def __init__(self, name, in_name, out_channels=None, kernel_size=3, padding='same', stride=1, output=False):
+    def __init__(self, name, in_name=None, out_channels=None, kernel_size=3, padding='same', stride=1, output=False):
         super().__init__()
         self.props = {'name': name, 'in_name': in_name, 'in_channels': None, 'out_channels': out_channels,
                       'stride': stride, 'kernel_size': kernel_size, 'padding': padding,
-                      'in_resol': None, 'out_resol': None, 'output': output}
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'conv'}
         self.args = ['in_channels', 'out_channels', 'kernel_size', 'padding', 'stride']
 
     def fill_and_append(self, building_modules):
@@ -111,6 +126,9 @@ class Conv2d(ModuleDefBase):
         self['in_channels'] = bef_module['out_channels']
         self['in_resol'] = bef_module['out_resol']
         self['out_resol'] = self['in_resol'] // self['stride']
+        if self['stride'] > 1:
+            self['out_resol'] = (self['in_resol'] - 1) // self['stride']
+            self['padding'] = 0
         building_modules[self['name']] = self
         return building_modules
 
@@ -124,7 +142,7 @@ class MaxPool2d(ModuleDefBase):
         super().__init__()
         self.props = {'name': name, 'in_name': in_name, 'in_channels': None, 'out_channels': None,
                       'stride': stride, 'kernel_size': kernel_size,
-                      'in_resol': None, 'out_resol': None, 'output': output}
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'pool'}
         self.args = ['kernel_size', 'stride']
 
     def fill_and_append(self, building_modules):
@@ -144,7 +162,7 @@ class Activation(ModuleDefBase):
         super().__init__()
         self.props = {'name': name, 'function': function, 'in_name': in_name,
                       'in_channels': None, 'out_channels': None,
-                      'in_resol': None, 'out_resol': None, 'output': output}
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'acti'}
         self.props.update(kwargs)
         self.args = list(kwargs.keys())
 
@@ -166,12 +184,29 @@ class Activation(ModuleDefBase):
             return self.single_input, torch.nn.Softmax(**args)
 
 
+class BatchNormalization(ModuleDefBase):
+    def __init__(self, name, in_name, output=False):
+        super().__init__()
+        self.props = {'name': name, 'in_name': in_name,
+                      'in_channels': None, 'out_channels': None,
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'bn'}
+        self.args = ['in_channels']
+
+    def fill_and_append(self, building_modules):
+        bef_module = building_modules[self['in_name']]
+        self.fill_default(bef_module)
+        building_modules[self['name']] = self
+        return building_modules
+
+    def get_module(self):
+        return self.single_input, torch.nn.BatchNorm2d(num_features=self['in_channels'])
+
 class Arithmetic(ModuleDefBase):
     def __init__(self, name, function, in_name, output=False):
         super().__init__()
         self.props = {'name': name, 'function': function, 'in_name': in_name,
                       'in_channels': None, 'out_channels': None,
-                      'in_resol': None, 'out_resol': None, 'output': output}
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'arth'}
 
     def fill_and_append(self, building_modules):
         bef_module0 = building_modules[self['in_name'][0]]
@@ -198,7 +233,7 @@ class Flatten(ModuleDefBase):
         super().__init__()
         self.props = {'name': name, 'in_name': in_name,
                       'in_channels': None, 'out_features': None,
-                      'in_resol': None, 'output': output}
+                      'in_resol': None, 'output': output, 'alias': 'flat'}
 
     def fill_and_append(self, building_modules):
         bef_module = building_modules[self['in_name']]
@@ -216,7 +251,7 @@ class Linear(ModuleDefBase):
     def __init__(self, name, in_name, out_features=None, output=False):
         super().__init__()
         self.props = {'name': name, 'in_name': in_name,
-                      'in_features': None, 'out_features': out_features, 'output': output}
+                      'in_features': None, 'out_features': out_features, 'output': output, 'alias': 'linear'}
         self.args = ['in_features', 'out_features']
 
     def fill_and_append(self, building_modules):
@@ -229,3 +264,64 @@ class Linear(ModuleDefBase):
     def get_module(self):
         args = {arg: self.props[arg] for arg in self.args}
         return self.single_input, torch.nn.Linear(**args)
+
+
+class Upsample2d(ModuleDefBase):
+    def __init__(self, name, in_name, output=False):
+        super().__init__()
+        self.props = {'name': name, 'in_name': in_name,
+                      'in_channels': None, 'out_channels': None,
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'upsamp'}
+
+    def fill_and_append(self, building_modules):
+        bef_module = building_modules[self['in_name']]
+        self.fill_default(bef_module)
+        self['out_resol'] = self['in_resol'] * 2
+        building_modules[self['name']] = self
+        return building_modules
+
+    def get_module(self):
+        return self.single_input, torch.nn.Upsample(scale_factor=2, mode='bilinear')
+
+
+class Concat(ModuleDefBase):
+    def __init__(self, name, in_name=None, output=False):
+        super().__init__()
+        self.props = {'name': name, 'in_name': in_name,
+                      'in_channels': None, 'out_channels': None,
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'concat'}
+
+    def fill_and_append(self, building_modules):
+        bef_module0 = building_modules[self['in_name'][0]]
+        bef_module1 = building_modules[self['in_name'][1]]
+        assert np.allclose(bef_module0['out_resol'], bef_module1['out_resol'])
+        self.fill_default(bef_module0)
+        self['in_channels'] = [bef_module0['out_channels'], bef_module1['out_channels']]
+        self['out_channels'] = bef_module0['out_channels'] + bef_module1['out_channels']
+        building_modules[self['name']] = self
+        return building_modules
+
+    def get_module(self):
+        return self.multi_input, lambda x: torch.cat(x, dim=1)
+
+
+class Padding(ModuleDefBase):
+    def __init__(self, name=None, in_name=None, padding=(0, 1, 0, 1), value=0, output=False):
+        super().__init__()
+        self.props = {'name': name, 'in_name': in_name, 'padding': padding, 'value': value,
+                      'in_channels': None, 'out_channels': None,
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'pad'}
+        self.args = ['padding', 'value']
+
+    def fill_and_append(self, building_modules):
+        bef_module = building_modules[self['in_name']]
+        self.fill_default(bef_module)
+        padding = self['padding']
+        self['out_resol'] = self['in_resol'] + np.array((padding[2] + padding[3],
+                                                         padding[0] + padding[1]), dtype=np.int32)
+        building_modules[self['name']] = self
+        return building_modules
+
+    def get_module(self):
+        args = {arg: self.props[arg] for arg in self.args}
+        return self.single_input, torch.nn.ConstantPad2d(**args)
