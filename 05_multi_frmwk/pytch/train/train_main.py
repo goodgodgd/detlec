@@ -7,8 +7,8 @@ import numpy as np
 
 import settings
 import config as cfg
-from pytch.model.model_object_def import ModelTemplate
-from pytch.data.datasets import Cifar10Dataset
+from pytch.model.model_factory import ModelTemplate
+import pytch.data.dataloader as dl
 from neutr.loss_factory import IntegratedLoss
 import pytch.train.train_val as tv
 import pytch.train.loss_pool as loss_pool
@@ -22,11 +22,14 @@ def train_main():
 
 
 def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_save):
+    print("==== train by plan")
     batch_size, train_mode = cfg.Train.BATCH_SIZE, cfg.Train.MODE
     ckpt_path = op.join(cfg.Paths.CHECK_POINT, cfg.Train.CKPT_NAME)
-    dataset_train, train_steps, imshape = Cifar10Dataset(cfg.Datasets.Cifar10.DOWNLOAD_PATH, "train", batch_size, False).get_dataloader()
-    dataset_val, val_steps, _ = Cifar10Dataset(cfg.Datasets.Cifar10.DOWNLOAD_PATH, "val", batch_size, False).get_dataloader()
+    dataset_train, train_steps, imshape = get_dataset(dataset_name, 'train', batch_size, True)
+    dataset_val, val_steps, _ = get_dataset(dataset_name, 'val', batch_size, False)
     model, loss_object, optimizer, start_epoch = create_training_parts(imshape, ckpt_path, learning_rate, loss_weights)
+    return
+
     if end_epoch <= start_epoch:
         print(f"!! end_epoch {end_epoch} <= start_epoch {start_epoch}, no need to train")
         return
@@ -44,11 +47,19 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
         save_model_ckpt(ckpt_path, model, optimizer, end_epoch, f"ep{end_epoch:02d}")
 
 
-def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
-    raise NotImplementedError()
+def get_dataset(dataset_name, split, batch_size=4, shuffle=False):
+    if dataset_name == 'kitti':
+        data_cfg = cfg.Datasets.Kitti
+    elif dataset_name == 'cifar10':
+        data_cfg = cfg.Datasets.Cifar10
+    else:
+        raise ValueError(f"No dataset named {dataset_name} is prepared")
+    print("data_c2qfg", data_cfg)
+    return dl.make_dataloader(data_cfg, split, batch_size, shuffle)
 
 
 def create_training_parts(imshape, ckpt_path, learning_rate, loss_weights, weight_suffix='latest'):
+    print("===== create model template")
     model = ModelTemplate(cfg.Architecture, imshape)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     model, optimizer, epoch = try_load_weights(ckpt_path, model, optimizer, weight_suffix)

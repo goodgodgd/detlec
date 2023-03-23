@@ -5,6 +5,7 @@ import torchvision as tv
 
 import neutr.data.preprocess as pp
 import pytch.data.datasets as pds
+import pytch.utils.util_function as puf
 import config as cfg
 
 
@@ -13,31 +14,48 @@ class ToTensor:
     def __call__(self, example):
         for key, val in example.items():
             if isinstance(val, np.ndarray):
-                example[key] = torch.from_numpy(val)
-        # numpy image: H x W x C
-        # torch image: C x H x W
+                device = puf.device()
+                if key == 'category':
+                    val = torch.from_numpy(val).long().to(device)
+                else:
+                    val = torch.from_numpy(val).float().to(device)
+                example[key] = val
+        # image: H x W x C -> C x H x W
         example['image'] = example['image'].permute(2, 0, 1)
         return example
 
 
-def make_dataloader(dset_cfg, split, batch_size=4, shuffle=False, num_workers=0):
-    transform = get_transform(dset_cfg)
-    dataset = get_dataset(dset_cfg, split, transform)
-    dataloader = td.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
-    return dataloader
+def make_dataloader(data_cfg, split, batch_size=4, shuffle=False, num_workers=0):
+    simple_datasets = {'cifar10': pds.Cifar10Dataset}
+    print("data_cfg", data_cfg)
+    if data_cfg.NAME in simple_datasets:
+        dataset_class = simple_datasets[data_cfg.NAME]
+        return dataset_class(data_cfg.PATH, split, batch_size, shuffle, num_workers).get_dataloader()
+
+    transform = get_transform(data_cfg)
+    dataset = get_dataset(data_cfg, split, transform)
+    dataloader = td.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, generator=torch.Generator(device=puf.device()))
+
+    steps = len(dataset) // batch_size
+    x = dataset[0]
+    imshape = x['image'].shape
+    return dataloader, steps, imshape
 
 
 def get_transform(dset_cfg):
-    target_hw = dset_cfg.INPUT_RESOLUTION
-    trfm = tv.transforms.Compose([pp.ExampleCropper(target_hw, dset_cfg.CROP_TLBR),
-                                  pp.ExampleResizer(target_hw),   # box in pixel scale
-                                  pp.ExampleBoxScaler(),          # box in (0~1) scale
-                                  pp.ExampleCategoryRemapper(dset_cfg.CATEGORIES_TO_USE,
-                                                   dset_cfg.CATEGORY_REMAP,
-                                                   cfg.DataCommon.CATEGORY_NAMES),
-                                  pp.ExampleZeroPadBbox(cfg.DataCommon.MAX_BBOX_PER_IMAGE),
-                                  ToTensor()
-                                 ])
+    if dset_cfg.NAME == 'kitti':
+        target_hw = dset_cfg.INPUT_RESOLUTION
+        trfm = tv.transforms.Compose([pp.ExampleCropper(target_hw, dset_cfg.CROP_TLBR),
+                                      pp.ExampleResizer(target_hw),   # box in pixel scale
+                                      pp.ExampleBoxScaler(),          # box in (0~1) scale
+                                      pp.ExampleCategoryRemapper(dset_cfg.CATEGORIES_TO_USE,
+                                                       dset_cfg.CATEGORY_REMAP,
+                                                       cfg.DataCommon.CATEGORY_NAMES),
+                                      pp.ExampleZeroPadBbox(cfg.DataCommon.MAX_BBOX_PER_IMAGE),
+                                      ToTensor()
+                                     ])
+    else:
+        raise ValueError(f"No dataset named {dset_cfg.NAME} is prepared")
     return trfm
 
 

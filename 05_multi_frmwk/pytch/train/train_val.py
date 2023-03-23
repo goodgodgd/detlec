@@ -9,7 +9,7 @@ from timeit import default_timer as timer
 
 import neutr.utils.util_function as nuf
 import pytch.utils.util_function as puf
-from neutr.log.logger import Logger
+# from neutr.log.logger import Logger
 from pytch.train.fmap_generator import SinglePositivePolicy
 
 

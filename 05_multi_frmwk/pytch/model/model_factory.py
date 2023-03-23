@@ -10,6 +10,7 @@ IN_NAMES = ModuleDefBase.INPUT_NAMES
 class ModelTemplate(torch.nn.Module):
     def __init__(self, architecture, input_shape=(3, 320, 320)):
         super().__init__()
+        print("===== model template init")
         model_def = ModelDefFactory(architecture, input_shape).get_model_def()
         self.input_names = [name for (name, module) in model_def.items() if isinstance(module, bmd.Input)]
         self.output_names = [name for (name, module) in model_def.items() if module['output']]
@@ -37,6 +38,7 @@ class ModelTemplate(torch.nn.Module):
 class ModelDefFactory(BlockModuleDefBase):
     def __init__(self, architecture, chw_shape):
         super().__init__('')    # top name must be ''(empty) or start with '/' e.g. '/model'
+        ModuleDefBase.CLASS_COUNT = {}
         self.block_def = self.define_model(architecture, chw_shape)
         self.model_def = self.fill_and_append({})
         print(self)
@@ -66,7 +68,9 @@ class ModelDefFactory(BlockModuleDefBase):
     def __str__(self):
         text = "[ModelDefFactory] Model{\n"
         for index, (name, module_def) in enumerate(self.model_def.items()):
-            text += f"\t{index:02}: {module_def}\n"
+            line = f"\t{index:02}: {module_def}\n"
+            if 'Activation' not in line and 'BatchNormalization' not in line:
+                text += line
         text += '}'
         return text
 

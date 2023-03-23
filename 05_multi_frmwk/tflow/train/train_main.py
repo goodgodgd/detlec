@@ -31,8 +31,8 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
         return
 
     dataset_train, train_steps, imshape = \
-        get_dataset(tfrd_path, dataset_name, False, batch_size, "train")
-    dataset_val, val_steps, _ = get_dataset(tfrd_path, dataset_name, False, batch_size, "val")
+        get_dataset(tfrd_path, dataset_name, "train", batch_size, False)
+    dataset_val, val_steps, _ = get_dataset(tfrd_path, "val", dataset_name, batch_size, False)
 
     model, loss_object, optimizer = create_training_parts(batch_size, imshape, ckpt_path,
                                                           learning_rate, loss_weights)
@@ -49,7 +49,7 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
         save_model_ckpt(ckpt_path, model, f"ep{end_epoch:02d}")
 
 
-def get_dataset(tfrd_path, dataset_name, shuffle, batch_size, split):
+def get_dataset(tfrd_path, dataset_name, split, batch_size, shuffle):
     tfrpath = op.join(tfrd_path, f"{dataset_name}_{split}")
     reader = TfrecordReader(tfrpath, shuffle, batch_size, 1)
     dataset = reader.get_dataset()

@@ -31,7 +31,6 @@ class Kitti2dDetectDataset:
         return example
 
 
-
 class Cifar10Dataset:
     def __init__(self, data_path, split, batch_size, shuffle):
         self.data_path = data_path

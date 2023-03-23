@@ -2,6 +2,10 @@ import numpy as np
 import torch
 
 
+def device():
+    return torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+
 def convert_box_format_tlbr_to_yxhw(boxes_tlbr):
     """
     :param boxes_tlbr: (batch, 4+?, N)
