@@ -17,7 +17,7 @@ class Input(ModuleDefBase):
 
 
 class Conv2d(ModuleDefBase):
-    def __init__(self, name, in_name=None, out_channels=None, kernel_size=3, padding='same', stride=1, output=False):
+    def __init__(self, name=None, in_name=None, out_channels=None, kernel_size=3, padding='same', stride=1, output=False):
         super().__init__()
         self.props = {'name': name, 'in_name': in_name, 'in_channels': None, 'out_channels': out_channels,
                       'stride': stride, 'kernel_size': kernel_size, 'padding': padding,
@@ -229,3 +229,33 @@ class Padding(ModuleDefBase):
     def get_module(self):
         args = {arg: self.props[arg] for arg in self.args}
         return self.single_input, torch.nn.ConstantPad2d(**args)
+
+
+class Reshape5D(ModuleDefBase):
+    def __init__(self, name, in_name=None, anchors=None, output=False):
+        super().__init__()
+        self.props = {'name': name, 'in_name': in_name, 'anchors': anchors,
+                      'in_channels': None, 'out_channels': None,
+                      'in_resol': None, 'out_resol': None, 'output': output, 'alias': 'bn'}
+        self.args = ['in_channels']
+
+    def fill_and_append(self, building_modules):
+        bef_module = building_modules[self['in_name']]
+        self.fill_default(bef_module)
+        building_modules[self['name']] = self
+        return building_modules
+
+    def get_module(self):
+        return self.single_input, Reshape5DModule(self['anchors'])
+
+
+class Reshape5DModule(torch.nn.Module):
+    def __init__(self, anchors):
+        super().__init__()
+        self.anchors = anchors
+
+    def forward(self, x):
+        batch, channel, height, width = x.shape
+        out_channel = channel // self.anchors
+        x = torch.reshape(x, (batch, out_channel, self.anchors, height, width))
+        return x

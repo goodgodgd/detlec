@@ -36,7 +36,7 @@ def convert_box_format_yxhw_to_tlbr(boxes_yxhw):
     return output
 
 
-def slice_features_and_merge_dims(featin, composition):
+def slice_features_and_merge_dims(featin, composition, dim=1):
     """
     :param featin: [(batch, channels, anchors, grid_h, grid_w) x 3]
     :param composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
@@ -44,21 +44,21 @@ def slice_features_and_merge_dims(featin, composition):
     """
     newfeat = []
     for scale_data in featin:
-        slices = slice_feature(scale_data, composition)
+        slices = slice_feature(scale_data, composition, dim)
         slices = {key: merge_dim_hwa(fmap) for key, fmap in slices.items()}
         newfeat.append(slices)
     featout = scale_align_featmap(newfeat)
     return featout
 
 
-def slice_feature(feature, channel_composition):
+def slice_feature(feature, composition, dim=1):
     """
     :param feature: (batch, channels, anchors, grid_h, grid_w)
-    :param channel_composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
+    :param composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
     :return: {"yxhw": (batch, 4, anchors, grid_h, grid_w), "object": ..., "category": ...}
     """
-    names, channels = list(channel_composition.keys()), list(channel_composition.values())
-    slices = torch.split(feature, channels, dim=1)
+    names, channels = list(composition.keys()), list(composition.values())
+    slices = torch.split(feature, channels, dim=dim)
     slices = dict(zip(names, slices))  # slices = {'yxhw': (B,4,A,H,W,4), 'object': (B,1,A,H,W), ...}
     return slices
 
@@ -69,7 +69,7 @@ def merge_dim_hwa(feature):
     :return: (batch, channels, anchor * grid_h * grid_w)
     """
     batch, channel, anchor, grid_h, grid_w = feature.shape
-    merged_feat = feature.view(batch, channel, anchor*grid_h*grid_w)
+    merged_feat = feature.reshape(batch, channel, anchor*grid_h*grid_w)
     return merged_feat
 
 
@@ -106,16 +106,24 @@ def compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr=None, pred_tlbr=None):
     return iou
 
 
-def convert_to_numpy(data):
+def convert_to_numpy(data, move_axis=False, srcdim=0, dstdim=0):
     if isinstance(data, list):
         for i, datum in enumerate(data):
-            data[i] = convert_to_numpy(datum)
+            data[i] = convert_to_numpy(datum, move_axis, srcdim, dstdim)
     elif isinstance(data, dict):
         for key, datum in data.items():
-            data[key] = convert_to_numpy(datum)
+            if key == 'image':
+                data[key] = convert_to_numpy(datum, True, -3, -1)
+                if np.max(data[key]) <= 1.:
+                    data[key] *= 255.
+                data[key] = data[key].astype(np.uint8)
+            elif key == 'fmap':
+                data[key] = convert_to_numpy(datum, True, 1, -1)
+            else:
+                data[key] = convert_to_numpy(datum, move_axis, srcdim, dstdim)
     elif torch.is_tensor(data):
-        data =  data.detach().cpu().numpy()
-        if data.ndim > 2:
+        data = data.detach().cpu().numpy()
+        if move_axis:
             data = np.moveaxis(data, 1, -1)   # convert channel first to channel last format
     return data
 

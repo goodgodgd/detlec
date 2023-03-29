@@ -7,44 +7,49 @@ import pytch.utils.util_function as puf
 
 class SinglePositivePolicy:
     def __init__(self):
-        self.anchor_ratio = cfg.ModelOutput.ANCHORS_RATIO
+        self.anchor_ratio = torch.from_numpy(cfg.ModelOutput.ANCHORS_RATIO).to(puf.device())
         self.feat_scales = cfg.ModelOutput.FEATURE_SCALES
         self.grtr_compos = cfg.ModelOutput.GRTR_FMAP_COMPOSITION
         self.num_anchor = len(self.anchor_ratio) // len(self.feat_scales)
 
     def __call__(self, features):
         """
-        :param features: {"image": (B,3,H,W), "inst": (B,5+K,N)}
-        :return: {"image": (B,3,H,W), "inst": {"whole": (B,5+K,N), "yxhw": (B,4,N), ...},
+        :param features: {"image": (B,3,H,W), "inst": (B,N,5+K)}
+        :return: {"image": (B,3,H,W), "inst": {"whole": (B,N,5+K), "yxhw": (B,N,4), ...},
                   "fmap": {"whole": (B,5+K,A,GH,GW), "yxhw": (B,4,A*GH*GW), ...}}
         """
         imshape = features["image"].shape[2:]
         feat_shapes = [np.array(imshape) // scale for scale in self.feat_scales]
         new_inst = {"whole": features["inst"]}
-        new_inst.update(puf.slice_feature(features["inst"], self.grtr_compos))
+        new_inst.update(puf.slice_feature(features["inst"], self.grtr_compos, dim=-1))
 
-        bbox_hw = new_inst["yxhw"][:, np.newaxis, 2:4]  # (B, 1, 2, N)
-        anchors_hw = self.anchor_ratio[np.newaxis, np.newaxis]  # (1, 9, 2, 1)
-        inter_hw = np.minimum(bbox_hw, anchors_hw)  # (B, 9, 2, N)
-        inter_area = inter_hw[:, :, 0] * inter_hw[:, :, 1]  # (B, 9, N)
+        bbox_hw = new_inst["yxhw"][:, :, None, 2:4]     # (B, N, 1, 2)
+        anchors_hw = self.anchor_ratio                  # (9, 2)
+        inter_hw = torch.minimum(bbox_hw, anchors_hw)      # (B, N, 9, 2)
+        inter_area = inter_hw[..., 0] * inter_hw[..., 1]  # (B, N, 9)
         # (B, 1, N) + (1, 9, 1) = (B, 9, N)
-        union_area = bbox_hw[:, :, 0] * bbox_hw[:, :, 1] + anchors_hw[:, :, 0, 0] * anchors_hw[:, :, 1, 0] - inter_area
+        union_area = bbox_hw[..., 0] * bbox_hw[..., 1] + anchors_hw[..., 0] * anchors_hw[..., 1] - inter_area   # (B, N, 9)
         iou = inter_area / union_area
-        best_anchor_indices = np.argmax(iou, axis=-1)   # (B, 9, N) -> (B, 9)
-        batch, channel = bbox_hw.shape[0], new_inst["whole"].shape[1]
-        feat_map = [np.zeros((batch, channel, self.num_anchor, fmap_hw[0], fmap_hw[1]), dtype=np.float32)
+        best_anchor_indices = torch.argmax(iou, dim=-1)   # (B, N, 9) -> (B, N)
+        batch, num_inst, channel = new_inst["whole"].shape
+        feat_map = [torch.zeros((batch, fmap_hw[0], fmap_hw[1], self.num_anchor, channel), dtype=torch.float32)
                     for fmap_hw in feat_shapes]
 
-        for batch in range(batch):
-            for anchor_index, inst in zip(best_anchor_indices[batch], new_inst["whole"][batch]):
-                if np.all(inst == 0):
-                    break
-                scale_index = anchor_index // self.num_anchor
-                anchor_index_in_scale = anchor_index % self.num_anchor
-                # inst: [y, x, h, w, object, category]
-                grid_yx = (inst[:2] * feat_shapes[scale_index]).type(torch.int32)
-                assert torch.all(grid_yx >= 0) and torch.all(grid_yx < feat_shapes[scale_index])
-                feat_map[scale_index][batch, grid_yx[0], grid_yx[1], anchor_index_in_scale] = inst
+        scale_index = best_anchor_indices // self.num_anchor    # (B, N)
+        anchor_index = best_anchor_indices % self.num_anchor    # (B, N)
+        valid_inst_mask = features["inst"][..., 2] > 0
+        for scale, fmap in enumerate(feat_map):
+            scale_mask = (scale_index == scale) * valid_inst_mask   # (B, N)
+            anchor_index_in_scale = anchor_index * scale_mask       # (B, N)
+            anchor_index_in_scale = puf.convert_to_numpy(anchor_index_in_scale).astype(np.int32)
+            fmap_hw = torch.tensor(fmap.shape[1:3])
+            grid_yx = features["inst"][..., :2] * torch.unsqueeze(scale_mask, 2) * fmap_hw  # (B, N, 2) * (B, N, 1) * 2
+            grid_yx = puf.convert_to_numpy(grid_yx).astype(np.int32)
+            frame_ind = np.arange(0, batch)[:, np.newaxis] * np.ones((batch, num_inst)) # (B, 1) * (B, N)
+            scale_feature = features["inst"] * torch.unsqueeze(scale_mask, 2)
+            fmap[frame_ind, grid_yx[..., 0], grid_yx[..., 1], anchor_index_in_scale] = scale_feature # (B, H, W, A, C)
+            # print("objc", torch.sum(fmap[..., 4]), torch.sum(scale_mask))
+            feat_map[scale] = torch.permute(fmap, (0, 4, 3, 1, 2))
 
         feat_slices = puf.slice_features_and_merge_dims(feat_map, self.grtr_compos)
         feat_map = {"whole": feat_map}

@@ -28,7 +28,6 @@ def train_by_plan(dataset_name, end_epoch, learning_rate, loss_weights, model_sa
     dataset_train, train_steps, imshape = get_dataset(dataset_name, 'train', batch_size, True)
     dataset_val, val_steps, _ = get_dataset(dataset_name, 'val', batch_size, False)
     model, loss_object, optimizer, start_epoch = create_training_parts(imshape, ckpt_path, learning_rate, loss_weights)
-    return
 
     if end_epoch <= start_epoch:
         print(f"!! end_epoch {end_epoch} <= start_epoch {start_epoch}, no need to train")

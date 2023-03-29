@@ -27,7 +27,6 @@ class ToTensor:
 
 def make_dataloader(data_cfg, split, batch_size=4, shuffle=False, num_workers=0):
     simple_datasets = {'cifar10': pds.Cifar10Dataset}
-    print("data_cfg", data_cfg)
     if data_cfg.NAME in simple_datasets:
         dataset_class = simple_datasets[data_cfg.NAME]
         return dataset_class(data_cfg.PATH, split, batch_size, shuffle, num_workers).get_dataloader()
@@ -89,13 +88,16 @@ def test_dataset():
 
 
 def test_dataloader():
-    dataloader = make_dataloader(cfg.Datasets.Kitti, "train", batch_size=4, shuffle=True)
+    if torch.cuda.is_available():
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    dataloader, steps, imshape = make_dataloader(cfg.Datasets.Kitti, "train", batch_size=4, shuffle=True)
     for i, data in enumerate(dataloader):
-        print("frame", i, "inst", data['inst'].size())
-        image = data['image'][0].numpy()
-        image = image.transpose((1, 2, 0))
-        inst = data['inst'][0].numpy()
+        data = puf.convert_to_numpy(data)
+        image = data['image'][0]
+        inst = data['inst'][0]
+        # image = image.astype(np.uint8)
         image = nuf.draw_boxes(image, inst, cfg.Datasets.Kitti.CATEGORIES_TO_USE)
+        print("frame", i, image.shape, image.dtype, "inst", inst.shape)
         cv2.imshow("image", image)
         key = cv2.waitKey()
         if key == ord('q'):

@@ -3,6 +3,8 @@ import torch
 import config as cfg
 from pytch.model.module_def_base import ModuleDefBase, BlockModuleDefBase
 import pytch.model.basic_module_def as bmd
+import pytch.model.model_util as mu
+import pytch.utils.util_function as puf
 
 IN_NAMES = ModuleDefBase.INPUT_NAMES
 
@@ -12,6 +14,9 @@ class ModelTemplate(torch.nn.Module):
         super().__init__()
         print("===== model template init")
         model_def = ModelDefFactory(architecture, input_shape).get_model_def()
+        self.post_proc = None
+        if architecture.POSTPROCESS == 'detector':
+            self.post_proc = mu.DetectorPostProcess()
         self.input_names = [name for (name, module) in model_def.items() if isinstance(module, bmd.Input)]
         self.output_names = [name for (name, module) in model_def.items() if module['output']]
         self.model_def = model_def
@@ -27,11 +32,13 @@ class ModelTemplate(torch.nn.Module):
         return modules
 
     def forward(self, x):
-        module_outputs = {self.input_names[0]: x}
+        module_outputs = {self.input_names[0]: x['image']}
         for name, (input_gen, module) in self.modules.items():
             input_tensor = input_gen(self.model_def[name]['in_name'], module_outputs)
             module_outputs[name] = module(input_tensor)
         model_output = {name: module_outputs[name] for name in self.output_names}
+        if self.post_proc:
+            model_output = self.post_proc(model_output)
         return model_output
 
 
@@ -59,6 +66,8 @@ class ModelDefFactory(BlockModuleDefBase):
             block_def.append(Classifier('classifier', num_class=10))
         else:
             raise ValueError(f"[define_model] {architecture.HEAD} is NOT implemented")
+
+
 
         return block_def
 
@@ -174,16 +183,16 @@ class Classifier(BlockModuleDefBase):
 class FPN(BlockModuleDefBase):
     def __init__(self, name=None, in_name=None):
         super().__init__(name, in_name)
-        self.num_anchors_per_scale = cfg.ModelOutput.NUM_ANCHORS_PER_SCALE
-        self.pred_channels_per_anchor = sum(list(cfg.ModelOutput.PRED_FMAP_COMPOSITION.values()))
-        last_channels = self.num_anchors_per_scale * self.pred_channels_per_anchor
+        anchors_per_scale = cfg.ModelOutput.NUM_ANCHORS_PER_SCALE
+        channels_per_anchor = sum(list(cfg.ModelOutput.PRED_FMAP_COMPOSITION.values()))
+        last_channels = anchors_per_scale * channels_per_anchor
         self.block_def = []
-        self.append_conv_5x(IN_NAMES[2], 512, 'pred_raw5', last_channels)
+        self.append_conv_5x(IN_NAMES[2], 512, 'head_logit5', last_channels)
         self.upsample_concat(IN_NAMES[2], IN_NAMES[1], 256, 4)
-        self.append_conv_5x('cat_4', 256, 'pred_raw4', last_channels)
+        self.append_conv_5x('cat_4', 256, 'head_logit4', last_channels)
         self.upsample_concat('cat_4', IN_NAMES[0], 256, 3)
-        self.append_conv_5x('cat_3', 128, 'pred_raw3', last_channels)
-        self['out_name'] = ['pred_raw5', 'pred_raw4', 'pred_raw3']
+        self.append_conv_5x('cat_3', 128, 'head_logit3', last_channels)
+        self['out_name'] = ['head_logit5', 'head_logit4', 'head_logit3']
         self['alias'] = 'fpn'
 
     def append_conv_5x(self, in_name, out_channels, last_name, last_channels):
@@ -219,6 +228,4 @@ if __name__ == "__main__":
     model = ModelTemplate(cfg.Architecture)
     x = torch.rand((2, 3, 320, 320), dtype=torch.float32)
     y = model(x)
-    print("model outputs:")
-    for k, v in y.items():
-        print(f"\t{k}: {v.shape}")
+    puf.print_structure("model output", y)
