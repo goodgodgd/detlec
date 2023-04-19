@@ -18,7 +18,6 @@ class HistoryLog:
         self.valid_log = pd.DataFrame()
         self.start = timer()
         self.summary = dict()
-        self.nms_box = mu.NonMaximumSuppressionBox()
         self.num_ctgr = len(cfg.DataCommon.CATEGORY_NAMES)
 
     def __call__(self, step, grtr, pred, total_loss, loss_by_type):

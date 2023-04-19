@@ -33,21 +33,16 @@ class CiouLoss(LossBase):
         """
         grtr_tlbr = puf.convert_box_format_yxhw_to_tlbr(grtr_yxhw)
         pred_tlbr = puf.convert_box_format_yxhw_to_tlbr(pred_yxhw)
-        # iou: (batch, AHW)
-        iou = puf.compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr, pred_tlbr)
-        cbox_tl = torch.minimum(grtr_tlbr[:, :2], pred_tlbr[:, :2])
+        iou = puf.compute_iou_aligned(grtr_yxhw, pred_yxhw, grtr_tlbr, pred_tlbr)   # (B, AHW)
+        cbox_tl = torch.minimum(grtr_tlbr[:, :2], pred_tlbr[:, :2])     # (B, 2, AHW)
         cbox_br = torch.maximum(grtr_tlbr[:, 2:], pred_tlbr[:, 2:])
         cbox_hw = cbox_br - cbox_tl
-        c = torch.sum(cbox_hw * cbox_hw, dim=-1)
-        center_diff = grtr_yxhw[:, :2] - pred_yxhw[:, :2]
-        u = torch.sum(center_diff * center_diff, dim=-1)
-        # NOTE: divide_no_nan results in nan gradient
-        # d = tf.math.divide_no_nan(u, c)
+        c = torch.sum(cbox_hw * cbox_hw, dim=1)     # (B, AHW)
+        center_diff = grtr_yxhw[:, :2] - pred_yxhw[:, :2]   # (B, 2, AHW)
+        u = torch.sum(center_diff * center_diff, dim=1)     # (B, AHW)
         d = u / (c + 1.0e-5)
 
-        # grtr_hw_ratio = tf.math.divide_no_nan(grtr_yxhw[:, 2], grtr_yxhw[:, 3])
-        # pred_hw_ratio = tf.math.divide_no_nan(pred_yxhw[:, 2], pred_yxhw[:, 3])
-        grtr_hw_ratio = grtr_yxhw[:, 2] / (grtr_yxhw[:, 3] + 1.0e-5)
+        grtr_hw_ratio = grtr_yxhw[:, 2] / (grtr_yxhw[:, 3] + 1.0e-5)    # (B, AHW)
         pred_hw_ratio = pred_yxhw[:, 2] / (pred_yxhw[:, 3] + 1.0e-5)
         coeff = torch.tensor(4.0 / (np.pi * np.pi))
         v = coeff * torch.pow((torch.atan(grtr_hw_ratio) - torch.atan(pred_hw_ratio)), 2)
@@ -93,12 +88,12 @@ class CategoryLoss(LossBase):
         grtr_cate = torch.squeeze(grtr["category"][scale])  # (batch, AHW)
         pred_cate = pred["category"][scale]                 # (batch, K, AHW)
         object_mask = torch.squeeze(grtr["object"][scale])  # (batch, AHW)
-        grtr_ctgr_indices = grtr_cate.type(torch.int)
+        grtr_ctgr_indices = grtr_cate.type(torch.int64)
         grtr_ctgr_onehot = f.one_hot(grtr_ctgr_indices, num_classes=self.num_ctgr)      # (batch, AHW, K)
         grtr_ctgr_onehot = grtr_ctgr_onehot.transpose(1, 2) # (batch, K, AHW)
         # category loss: binary cross entropy per category for multi-label classification (batch, K, AHW)
         grtr_ctgr_onehot = grtr_ctgr_onehot * (1 - 0.05) + (1 - grtr_ctgr_onehot) * 0.05
-        ctgr_loss = f.binary_cross_entropy(pred_cate, grtr_ctgr_onehot)     # (batch, K, AHW)
+        ctgr_loss = f.binary_cross_entropy(pred_cate, grtr_ctgr_onehot, reduction='none')     # (batch, K, AHW)
         # ctgr_loss_reduced: (batch, AHW)
         ctgr_loss = torch.sum(ctgr_loss, dim=1)
         scalar_loss = torch.sum(ctgr_loss * object_mask)

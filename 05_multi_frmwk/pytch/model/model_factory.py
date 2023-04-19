@@ -19,6 +19,7 @@ class ModelTemplate(torch.nn.Module):
             self.post_proc = mu.DetectorPostProcess()
         self.input_names = [name for (name, module) in model_def.items() if isinstance(module, bmd.Input)]
         self.output_names = [name for (name, module) in model_def.items() if module['output']]
+        self.output_names.sort()
         self.model_def = model_def
         self.modules = self.build(self.model_def)
 
@@ -192,7 +193,7 @@ class FPN(BlockModuleDefBase):
         self.append_conv_5x('cat_4', 256, 'head_logit4', last_channels)
         self.upsample_concat('cat_4', IN_NAMES[0], 256, 3)
         self.append_conv_5x('cat_3', 128, 'head_logit3', last_channels)
-        self['out_name'] = ['head_logit5', 'head_logit4', 'head_logit3']
+        self['out_name'] = ['head_logit3', 'head_logit4', 'head_logit5']
         self['alias'] = 'fpn'
 
     def append_conv_5x(self, in_name, out_channels, last_name, last_channels):

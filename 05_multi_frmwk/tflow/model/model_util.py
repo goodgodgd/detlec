@@ -52,7 +52,7 @@ class NonMaximumSuppressionBox:
 
     def __call__(self, pred):
         """
-        :param pred: {'yxhw': (batch, sum of Nx, 4), 'object': ..., 'category': ...}
+        :param pred: {'yxhw': [(batch, N, 4)]x3, 'object': ..., 'category': ...}
         :return: (batch, max_out, 6), 6: bbox, score, category
         """
         pred = {key: tf.concat(data, axis=1) for key, data in pred.items() if isinstance(data, list) and not key.endswith("_logit")}

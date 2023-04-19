@@ -15,13 +15,12 @@ class ToTensor:
         for key, val in example.items():
             if isinstance(val, np.ndarray):
                 device = puf.device()
-                if key == 'category':
-                    val = torch.from_numpy(val).long().to(device)
+                val = torch.from_numpy(val).float().to(device)
+                if key == 'image':
+                    val = torch.permute(val, (2, 0, 1))
                 else:
-                    val = torch.from_numpy(val).float().to(device)
+                    val = torch.transpose(val, -1, 0)   # channel first
                 example[key] = val
-        # image: H x W x C -> C x H x W
-        example['image'] = example['image'].permute(2, 0, 1)
         return example
 
 

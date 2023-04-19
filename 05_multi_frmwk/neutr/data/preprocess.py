@@ -158,7 +158,9 @@ class ExampleZeroPadBbox(PreprocessBase):
         if bboxes.shape[0] < self.max_bbox:
             new_bboxes = np.zeros((self.max_bbox, bboxes.shape[-1]), dtype=np.float32)
             new_bboxes[:bboxes.shape[0]] = bboxes
-            example["inst"] = new_bboxes
+        else:
+            new_bboxes = bboxes[:self.max_bbox]
+        example["inst"] = new_bboxes
         return example
 
 

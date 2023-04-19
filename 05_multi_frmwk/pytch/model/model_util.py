@@ -1,4 +1,5 @@
 import torch
+import torchvision as tv
 
 import config as cfg
 import pytch.utils.util_function as puf
@@ -24,10 +25,9 @@ class DetectorPostProcess:
         # TODO: NMS
         return output
 
-    def insert_anchor_dimension(self, head_logit):
+    def insert_anchor_dimension(self, feat_logit):
         new_logit = {}
-        for key, logit in head_logit.items():
-            print("insert anchor dim:", key, logit.shape)
+        for key, logit in feat_logit.items():
             batch, channel, height, width = logit.shape
             out_channel = channel // self.num_anchors_per_scale
             logit = torch.reshape(logit, (batch, out_channel, self.num_anchors_per_scale, height, width))
@@ -99,3 +99,61 @@ class FeatureDecoder:
         hw_dec = self.const_3 * torch.sigmoid(hw_5d - self.const_log_2) * anchors_tensor
         hw_dec = torch.reshape(hw_dec, (batch, 2, -1))
         return hw_dec
+
+
+class NonMaximumSuppressionBox:
+    def __init__(self, max_out=cfg.NmsInfer.MAX_OUT,
+                 iou_thresh=cfg.NmsInfer.IOU_THRESH,
+                 score_thresh=cfg.NmsInfer.SCORE_THRESH,
+                 ):
+        self.max_out = max_out
+        self.iou_thresh = iou_thresh
+        self.score_thresh = score_thresh
+        self.num_top = 300
+
+    def __call__(self, pred):
+        """
+        :param pred: {'yxhw': [(batch, N, 4)]x3, 'object': ..., 'category': ...}
+        :return: (batch, 6, max_out), 6: bbox, score, category
+        """
+        pred = {key: torch.cat(data, dim=2) for key, data in pred.items() if isinstance(data, list) and not key.endswith("_logit")}
+        boxes = torch.transpose(puf.convert_box_format_yxhw_to_tlbr(pred["yxhw"]), 1, 2)   # (batch, N, 4)
+        categories = torch.argmax(pred["category"], dim=1)      # (batch, N)
+        best_probs = torch.max(pred["category"], dim=1)         # (batch, N)
+        objectness = pred["object"][:, 0]                       # (batch, N)
+        scores = objectness * best_probs                        # (batch, N)
+        batch, numctgr, numbox = pred["category"].shape
+
+        batch_indices = [[] for i in range(batch)]
+        for ctgr_idx in range(numctgr):
+            ctgr_mask = (categories == ctgr_idx).type(torch.float32)    # (batch, N)
+            score_mask = (scores > self.score_thresh[ctgr_idx]).type(torch.float32) # (batch, N)
+            ctgr_boxes = boxes * ctgr_mask[..., None] * score_mask      # (batch, N, 4)
+            ctgr_scores = scores * ctgr_mask * score_mask               # (batch, N)
+
+            for frame_idx in range(batch):
+                top_scores, top_indices = torch.topk(ctgr_scores[frame_idx], self.num_top) # (N,) -> (M,)
+                boxes_in_frame = ctgr_boxes[frame_idx, top_indices]     # (M, 4)
+                selected_indices = tv.ops.nms(                          # (M,) -> (L,)
+                    boxes=boxes_in_frame,
+                    scores=ctgr_scores[frame_idx],
+                    iou_threshold=self.iou_thresh[ctgr_idx],
+                )
+                selected_indices = selected_indices[:self.max_out[ctgr_idx]]
+                padlen = self.max_out[ctgr_idx] - selected_indices.shape[0]
+                selected_indices = torch.nn.functional.pad(selected_indices, (0, padlen), mode='constant', value=-1)
+                batch_indices[frame_idx].append(selected_indices)       # (B, K, max_out)
+
+        # make batch_indices, valid_mask as fixed shape tensor
+        batch_indices = [torch.cat(ctgr_indices, dim=0) for ctgr_indices in batch_indices]  # (B, K*max_out)
+        batch_indices = torch.stack(batch_indices, dim=0)       # (batch, K*max_output)
+        valid_mask = (batch_indices >= 0).type(torch.float32)   # (batch, K*max_output)
+        batch_indices = torch.maximum(batch_indices, 0)
+
+        categories = categories.type(torch.float32)
+        # "bbox": 4, "object": 1, "category": 1
+        result = torch.stack([scores, categories], dim=-1)      # (B, N) x2 -> (B, N, 2)
+        result = torch.cat([pred["yxhw"], result], dim=-1)      # (B, N, 6)
+        result = torch.gather(result, dim=1, index=batch_indices)    # (batch, K*max_output, 6)
+        result = result * valid_mask[..., None]                 # (batch, K*max_output, 6)
+        return result

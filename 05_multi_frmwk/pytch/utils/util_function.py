@@ -8,35 +8,35 @@ def device():
 
 def convert_box_format_tlbr_to_yxhw(boxes_tlbr):
     """
-    :param boxes_tlbr: (batch, 4+?, N)
-    :return: (batch, 4+?, N)
+    :param boxes_tlbr: (batch, 4+?, ...)
+    :return: (batch, 4+?, ...)
     """
-    tlbr_components = torch.split(boxes_tlbr, 2, dim=-2)
-    boxes_yx = (tlbr_components[0] + tlbr_components[1]) / 2    # yx = (y1x1 + y2x2)/2
-    boxes_hw = tlbr_components[1] - tlbr_components[0]          # hw = y2x2 - y1x1
+    y1x1, y2x2 = boxes_tlbr[:, :2], boxes_tlbr[:, 2:4]
+    boxes_yx = (y1x1 + y2x2) / 2    # yx = (y1x1 + y2x2)/2
+    boxes_hw = y2x2 - y1x1          # hw = y2x2 - y1x1
     output = [boxes_yx, boxes_hw]
-    if len(tlbr_components) > 2:
-        output += list(tlbr_components[2:])
-    output = torch.cat(output, dim=-2)
+    if boxes_tlbr.shape[1] > 4:
+        output.append(boxes_tlbr[:, 4:])
+    output = torch.cat(output, dim=1)
     return output
 
 
 def convert_box_format_yxhw_to_tlbr(boxes_yxhw):
     """
-    :param boxes_yxhw: (batch, 4+?, N)
-    :return: (batch, 4+?, N)
+    :param boxes_yxhw: (batch, 4+?, ...)
+    :return: (batch, 4+?, ...)
     """
-    yxhw_components = torch.split(boxes_yxhw, 2, dim=-2)
-    boxes_tl = yxhw_components[0] - yxhw_components[1] / 2      # y1x1 = cy,cx + h/2,w/2
-    boxes_br = yxhw_components[0] + yxhw_components[1] / 2      # y1x1 = cy,cx + h/2,w/2
+    boxes_yx, boxes_hw = boxes_yxhw[:, :2], boxes_yxhw[:, 2:4]
+    boxes_tl = boxes_yx - boxes_hw / 2      # y1x1 = cy,cx + h/2,w/2
+    boxes_br = boxes_yx + boxes_hw / 2      # y1x1 = cy,cx + h/2,w/2
     output = [boxes_tl, boxes_br]
-    if len(boxes_yxhw) > 2:
-        output += list(boxes_yxhw[2:])
-    output = torch.cat(output, dim=-2)
+    if boxes_yxhw.shape[1] > 4:
+        output.append(boxes_yxhw[:, 4:])
+    output = torch.cat(output, dim=1)
     return output
 
 
-def slice_features_and_merge_dims(featin, composition, dim=1):
+def slice_features_and_merge_dims(featin, composition):
     """
     :param featin: [(batch, channels, anchors, grid_h, grid_w) x 3]
     :param composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
@@ -44,21 +44,21 @@ def slice_features_and_merge_dims(featin, composition, dim=1):
     """
     newfeat = []
     for scale_data in featin:
-        slices = slice_feature(scale_data, composition, dim)
+        slices = slice_feature(scale_data, composition)
         slices = {key: merge_dim_hwa(fmap) for key, fmap in slices.items()}
         newfeat.append(slices)
     featout = scale_align_featmap(newfeat)
     return featout
 
 
-def slice_feature(feature, composition, dim=1):
+def slice_feature(feature, composition):
     """
     :param feature: (batch, channels, anchors, grid_h, grid_w)
     :param composition: e.g. {"yxhw": 4, "object": 1, "category": 1}
     :return: {"yxhw": (batch, 4, anchors, grid_h, grid_w), "object": ..., "category": ...}
     """
     names, channels = list(composition.keys()), list(composition.values())
-    slices = torch.split(feature, channels, dim=dim)
+    slices = torch.split(feature, channels, dim=1)
     slices = dict(zip(names, slices))  # slices = {'yxhw': (B,4,A,H,W,4), 'object': (B,1,A,H,W), ...}
     return slices
 
