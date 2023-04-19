@@ -3,7 +3,7 @@ import numpy as np
 
 
 class Paths:
-    RESULT_ROOT = "F:/work/result"
+    RESULT_ROOT = "/home/ri-bear/workspace/dataset"
     TFRECORD = op.join(RESULT_ROOT, "tfrecord")
 
 
@@ -18,7 +18,7 @@ class Datasets:
     # specific dataset configs MUST have the same items
     class Kitti:
         NAME = "kitti"
-        PATH = "F:/work/dataset/kitti"
+        PATH = "/home/ri-bear/workspace/dataset/kitti_objdet"
         CATEGORIES_TO_USE = ["Pedestrian", "Car", "Van", "Truck", "Cyclist"]
         CATEGORY_REMAP = {"Pedestrian": "Person", "Cyclist": "Bicycle"}
         INPUT_RESOLUTION = (256, 832)   # (4,13) * 64

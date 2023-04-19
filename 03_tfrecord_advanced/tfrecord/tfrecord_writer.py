@@ -37,16 +37,13 @@ class TfrecordMaker:
     get raw examples from ExampleMaker and convert them into tf.data.Example.
     serialize examples and write serialized data into tfrecord files.
     """
-    def __init__(self, dataset_cfg, split, tfrpath, shard_size,
-                 drive_example_limit=0, total_example_limit=0):
+    def __init__(self, dataset_cfg, split, tfrpath, shard_size):
         self.dataset_cfg = dataset_cfg
         self.split = split                  # split name e.g. "train", "val", "test
         self.tfrpath__ = tfrpath + "__"     # temporary path to write tfrecord
         self.tfrpath = tfrpath              # path to save final tfrecord
         self.tfr_drive_path = ""            # path to write current drive's tfrecord
         self.shard_size = shard_size        # max number of examples in a shard
-        self.drive_example_limit = drive_example_limit
-        self.total_example_limit = total_example_limit
         # indices and counts
         self.drive_index = 0                # frame index in current drive
         self.shard_index = 0                # frame index in current shard
@@ -70,9 +67,6 @@ class TfrecordMaker:
                 # skip if drive_path has been completed
                 if self.init_drive_tfrecord():
                     continue
-                # stop if number of total frame exceeds the limit
-                if (self.total_example_limit > 0) and (self.total_example_count >= self.total_example_limit):
-                    break
 
                 drive_example = self.write_drive(drive_path)
                 self.write_tfrecord_config(drive_example)
@@ -111,17 +105,9 @@ class TfrecordMaker:
 
         for index in range(num_drive_frames):
             time1 = timer()
-            if (self.drive_example_limit > 0) and (self.drive_example_count >= self.drive_example_limit):
-                break
-            if (self.total_example_limit > 0) and (self.total_example_count >= self.total_example_limit):
-                break
-
             try:
                 example = example_maker.get_example(index)
                 drive_example = self.verify_example(drive_example, example)
-            except StopIteration as si:     # raised from next()
-                print("\n==[write_drive][StopIteration] stop this drive\n", si)
-                break
             except uc.MyExceptionToCatch as me:  # raised from xxx_reader._get_frame()
                 uf.print_progress(f"\n==[write_drive][MyException] {index}/{num_drive_frames}, {me}\n")
                 continue
